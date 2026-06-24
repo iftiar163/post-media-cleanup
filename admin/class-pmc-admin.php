@@ -22,7 +22,7 @@ class PMC_Admin{
     private function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
-        add_filter('plugin_action_links_post-media-cleanup/post-media-cleanup.php', [$this, 'add_settings_link']);
+        add_filter('plugin_action_links_' . plugin_basename( PMC_PLUGIN_DIR . 'post-media-cleanup.php' ), [$this, 'add_settings_link']);
     }
 
     public function add_menu() {
@@ -46,7 +46,7 @@ class PMC_Admin{
         register_setting(
             'pmc_settings_group',
             PMC_OPTION_KEY,
-            [$this, 'sanitize_settings']
+            [$this, 'sanitize']
         );
 
         add_settings_section(
@@ -156,7 +156,7 @@ class PMC_Admin{
         echo '<p class="description" style="color:#b32d2e;">' . esc_html__( 'Recommended: skip media that is also used by other posts.', 'post-media-cleanup' ) . '</p>';
     }
 
-    public function sanitize( $input ) {
+    public function sanitize_settings( $input ) {
         $clean = array();
 
         $clean['enabled']              = ! empty( $input['enabled'] );
@@ -188,6 +188,7 @@ class PMC_Admin{
             <form method="post" action="options.php">
                 <?php
                 settings_fields( 'pmc_settings_group' );
+                wp_nonce_field( 'pmc_settings_nonce' );
                 do_settings_sections( 'post-media-cleanup' );
                 submit_button();
                 ?>

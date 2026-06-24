@@ -74,7 +74,7 @@ class PMC_Media_Handler {
                 foreach( explode( ',', $srcset ) as $part ) {
                     $bits = preg_split('/\s+/', trim($part));
                     if( !empty($bits[0]) ) {
-                        $urls = self::strip_size_suffix( $bits[0] );
+                        $urls[] = self::strip_size_suffix( $bits[0] );
                     }
                 }
             }

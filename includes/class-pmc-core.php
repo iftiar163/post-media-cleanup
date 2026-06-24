@@ -76,7 +76,17 @@ class PMC_Core {
             return;
         }
 
-        foreach ( $this->pending[ $post_id ] as $att_id ) {
+        $ids = $this->pending[ $post_id ];
+        $ids = apply_filters( 'pmc_attachment_ids_to_delete', $ids, $post_id );
+
+        foreach ( $ids as $att_id ) {
+
+            $should_delete = true;
+            $should_delete = apply_filters( 'pmc_should_delete_attachment', $should_delete, $att_id, $post_id );
+
+            if( ! $should_delete ) {
+                continue;
+            }
 
             if( PMC_Settings::get( 'skip_shared' ) && $this->is_shared( $att_id, $post_id ) ) {
                 continue;

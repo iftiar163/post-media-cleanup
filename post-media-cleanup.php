@@ -49,7 +49,7 @@ function pmc_deactivate() {
     // No cleanup needed on deactivation, but you could choose to delete the settings if desired.
 }
 
-add_action('plugin_loaded', 'pmc_init');
+add_action('plugins_loaded', 'pmc_init');
 
 function pmc_init() {
     load_plugin_textdomain( 'post-media-cleanup', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
