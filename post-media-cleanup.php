@@ -52,8 +52,6 @@ function pmc_deactivate() {
 add_action('plugins_loaded', 'pmc_init');
 
 function pmc_init() {
-    load_plugin_textdomain( 'post-media-cleanup', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-
     PMC_Core::get_instance();
 
     if(is_admin()) {

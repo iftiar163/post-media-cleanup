@@ -100,15 +100,21 @@ class PMC_Core {
 
     private function is_shared( $att_id, $excluding_post_id ) {
         global $wpdb;
-        // Check 1 - is it a featured image on another post?
-        $featured_count = $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->postmeta}
-            WHERE meta_key   = '_thumbnail_id'
-            AND   meta_value = %d
-            AND   post_id   != %d",
-            $att_id,
-            $excluding_post_id
-        ) );
+        $cache_key = 'pmc_featured_' . $att_id . '_' . $excluding_post_id;
+        $featured_count = wp_cache_get( $cache_key, 'pmc_cache' );
+
+        if ( false === $featured_count ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $featured_count = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->postmeta}
+                WHERE meta_key   = '_thumbnail_id'
+                AND   meta_value = %d
+                AND   post_id   != %d",
+                $att_id,
+                $excluding_post_id
+            ) );
+            wp_cache_set( $cache_key, $featured_count, 'pmc_cache', HOUR_IN_SECONDS );
+        }
 
         if( $featured_count > 0 ) {
             return true;
@@ -124,14 +130,21 @@ class PMC_Core {
         $url_no_protocol = preg_replace( '#^https?://#', '', $url );
         $url_base        = preg_replace( '/-\d+x\d+(\.[a-zA-Z0-9]+)$/', '$1', $url_no_protocol );
 
-        $content_count = $wpdb->get_var( $wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->posts}
-            WHERE  post_status NOT IN ('trash', 'auto-draft')
-            AND    ID          != %d
-            AND    post_content LIKE %s",
-            $excluding_post_id,
-            '%' . $wpdb->esc_like( $url_base ) . '%'
-        ) );
+        $cache_key_content = 'pmc_content_' . md5( $url_base . '_' . $excluding_post_id );
+        $content_count = wp_cache_get( $cache_key_content, 'pmc_cache' );
+
+        if ( false === $content_count ) {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $content_count = (int) $wpdb->get_var( $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->posts}
+                WHERE  post_status NOT IN ('trash', 'auto-draft')
+                AND    ID          != %d
+                AND    post_content LIKE %s",
+                $excluding_post_id,
+                '%' . $wpdb->esc_like( $url_base ) . '%'
+            ) );
+            wp_cache_set( $cache_key_content, $content_count, 'pmc_cache', HOUR_IN_SECONDS );
+        }
 
         return $content_count > 0;
 
