@@ -22,7 +22,7 @@ class Postmediaweb_Admin{
     private function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
-        add_filter('plugin_action_links_' . plugin_basename( POSTMEDIAWEB_PLUGIN_DIR . 'post-media-cleanup.php' ), [$this, 'add_settings_link']);
+        add_filter('plugin_action_links_' . plugin_basename( POSTMEDIAWEB_PLUGIN_DIR . 'post-media-cleanup-webxperthub.php' ), [$this, 'add_settings_link']);
     }
 
     public function add_menu() {

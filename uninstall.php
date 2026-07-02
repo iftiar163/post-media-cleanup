@@ -14,13 +14,13 @@ delete_option( 'postmediaweb_settings' );
 
 // Multisite — clean every sub-site.
 if ( is_multisite() ) {
-    $sites = get_sites( array(
+    $postmediaweb_sites = get_sites( array(
         'number' => 0,
         'fields' => 'ids',
     ) );
 
-    foreach ( $sites as $site_id ) {
-        switch_to_blog( $site_id );
+    foreach ( $postmediaweb_sites as $postmediaweb_site_id ) {
+        switch_to_blog( $postmediaweb_site_id );
         delete_option( 'postmediaweb_settings' );
         restore_current_blog();
     }
