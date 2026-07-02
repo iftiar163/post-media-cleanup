@@ -2,7 +2,7 @@
 /**
  * Runs when the plugin is deleted from the Plugins screen.
  *
- * @package PostMediaCleanup
+ * @package PostMediaCleanupWebxperthub
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -10,7 +10,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 // Single site — delete our option.
-delete_option( 'post_media_cleanup_settings' );
+delete_option( 'postmediaweb_settings' );
 
 // Multisite — clean every sub-site.
 if ( is_multisite() ) {
@@ -21,7 +21,7 @@ if ( is_multisite() ) {
 
     foreach ( $sites as $site_id ) {
         switch_to_blog( $site_id );
-        delete_option( 'post_media_cleanup_settings' );
+        delete_option( 'postmediaweb_settings' );
         restore_current_blog();
     }
 }

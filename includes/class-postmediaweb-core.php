@@ -2,14 +2,14 @@
 /**
  * Core deletion engine.
  *
- * @package PostMediaCleanup
+ * @package PostMediaCleanupWebxperthub
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class PMC_Core {
+class Postmediaweb_Core {
 
     private static $instance = null;
 
@@ -37,7 +37,7 @@ class PMC_Core {
 
     public function collect( $post_id ) {
 
-        if( !PMC_Settings::is_enabled() ) {
+        if( !Postmediaweb_Settings::is_enabled() ) {
             return;
         }
 
@@ -55,13 +55,13 @@ class PMC_Core {
             return;
         }
 
-        $allowed = (array) PMC_Settings::get( 'post_types' );
+        $allowed = (array) Postmediaweb_Settings::get( 'post_types' );
 
         if( ! in_array( $post->post_type, $allowed, true ) ) {
             return;
         }
 
-        $ids = PMC_Media_Handler::get_all_attachment_ids( $post_id );
+        $ids = Postmediaweb_Media_Handler::get_all_attachment_ids( $post_id );
 
         if( empty($ids) ) {
             return;
@@ -77,18 +77,18 @@ class PMC_Core {
         }
 
         $ids = $this->pending[ $post_id ];
-        $ids = apply_filters( 'pmc_attachment_ids_to_delete', $ids, $post_id );
+        $ids = apply_filters( 'postmediaweb_attachment_ids_to_delete', $ids, $post_id );
 
         foreach ( $ids as $att_id ) {
 
             $should_delete = true;
-            $should_delete = apply_filters( 'pmc_should_delete_attachment', $should_delete, $att_id, $post_id );
+            $should_delete = apply_filters( 'postmediaweb_should_delete_attachment', $should_delete, $att_id, $post_id );
 
             if( ! $should_delete ) {
                 continue;
             }
 
-            if( PMC_Settings::get( 'skip_shared' ) && $this->is_shared( $att_id, $post_id ) ) {
+            if( Postmediaweb_Settings::get( 'skip_shared' ) && $this->is_shared( $att_id, $post_id ) ) {
                 continue;
             }
             wp_delete_attachment( $att_id, true );
@@ -100,8 +100,8 @@ class PMC_Core {
 
     private function is_shared( $att_id, $excluding_post_id ) {
         global $wpdb;
-        $cache_key = 'pmc_featured_' . $att_id . '_' . $excluding_post_id;
-        $featured_count = wp_cache_get( $cache_key, 'pmc_cache' );
+        $cache_key = 'postmediaweb_featured_' . $att_id . '_' . $excluding_post_id;
+        $featured_count = wp_cache_get( $cache_key, 'postmediaweb_cache' );
 
         if ( false === $featured_count ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -113,7 +113,7 @@ class PMC_Core {
                 $att_id,
                 $excluding_post_id
             ) );
-            wp_cache_set( $cache_key, $featured_count, 'pmc_cache', HOUR_IN_SECONDS );
+            wp_cache_set( $cache_key, $featured_count, 'postmediaweb_cache', HOUR_IN_SECONDS );
         }
 
         if( $featured_count > 0 ) {
@@ -130,8 +130,8 @@ class PMC_Core {
         $url_no_protocol = preg_replace( '#^https?://#', '', $url );
         $url_base        = preg_replace( '/-\d+x\d+(\.[a-zA-Z0-9]+)$/', '$1', $url_no_protocol );
 
-        $cache_key_content = 'pmc_content_' . md5( $url_base . '_' . $excluding_post_id );
-        $content_count = wp_cache_get( $cache_key_content, 'pmc_cache' );
+        $cache_key_content = 'postmediaweb_content_' . md5( $url_base . '_' . $excluding_post_id );
+        $content_count = wp_cache_get( $cache_key_content, 'postmediaweb_cache' );
 
         if ( false === $content_count ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -143,7 +143,7 @@ class PMC_Core {
                 $excluding_post_id,
                 '%' . $wpdb->esc_like( $url_base ) . '%'
             ) );
-            wp_cache_set( $cache_key_content, $content_count, 'pmc_cache', HOUR_IN_SECONDS );
+            wp_cache_set( $cache_key_content, $content_count, 'postmediaweb_cache', HOUR_IN_SECONDS );
         }
 
         return $content_count > 0;

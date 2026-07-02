@@ -1,4 +1,4 @@
-=== Post Media Cleanup ===
+=== Post Media Cleanup Webxperthub ===
 Contributors:      iftiarhossain
 Tags:              media, cleanup, delete, attachments, images
 Requires at least: 5.0
@@ -12,7 +12,7 @@ Automatically deletes all associated media files when a post is permanently dele
 
 == Description ==
 
-Post Media Cleanup removes orphaned media files from your server when you permanently delete a post.
+Post Media Cleanup Webxperthub removes orphaned media files from your server when you permanently delete a post.
 
 When you permanently delete a post, this plugin automatically finds and removes:
 
@@ -35,7 +35,7 @@ When you permanently delete a post, this plugin automatically finds and removes:
 Add extra attachments to the deletion list:
 
 `
-add_filter( 'pmc_attachment_ids_to_delete', function( $ids, $post_id ) {
+add_filter( 'postmediaweb_attachment_ids_to_delete', function( $ids, $post_id ) {
     $extra = get_post_meta( $post_id, 'my_custom_pdf', true );
     if ( $extra ) $ids[] = (int) $extra;
     return $ids;
@@ -45,7 +45,7 @@ add_filter( 'pmc_attachment_ids_to_delete', function( $ids, $post_id ) {
 Prevent a specific attachment from being deleted:
 
 `
-add_filter( 'pmc_should_delete_attachment', function( $should, $att_id, $post_id ) {
+add_filter( 'postmediaweb_should_delete_attachment', function( $should, $att_id, $post_id ) {
     if ( $att_id === 999 ) return false;
     return $should;
 }, 10, 3 );
@@ -55,7 +55,7 @@ add_filter( 'pmc_should_delete_attachment', function( $should, $att_id, $post_id
 
 1. Upload the plugin folder to /wp-content/plugins/
 2. Activate through the Plugins screen
-3. Go to Settings → Post Media Cleanup to configure
+3. Go to Settings → Post Media Cleanup Webxperthub to configure
 
 == Frequently Asked Questions ==
 
@@ -77,7 +77,7 @@ Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automa
 
 == Screenshots ==
 
-1. Settings page under Settings → Post Media Cleanup
+1. Settings page under Settings → Post Media Cleanup Webxperthub
 
 == Changelog ==
 

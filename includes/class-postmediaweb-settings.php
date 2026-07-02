@@ -2,14 +2,14 @@
 /**
  * Settings helper.
  *
- * @package PostMediaCleanup
+ * @package PostMediaCleanupWebxperthub
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class PMC_Settings {
+class Postmediaweb_Settings {
 
     private static $cache = null;
 
@@ -24,7 +24,7 @@ class PMC_Settings {
 
     public static function get( $key ) {
         if ( null === self::$cache ) {
-            $saved       = get_option( PMC_OPTION_KEY, array() );
+            $saved       = get_option( POSTMEDIAWEB_OPTION_KEY, array() );
             self::$cache = wp_parse_args( $saved, self::$defaults );
         }
 
