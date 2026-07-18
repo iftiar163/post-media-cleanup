@@ -107,6 +107,93 @@ class Postmediaweb_Media_Handler {
         }
     }
 
+    private static function get_divi_media( $post_id ) {
+        $ids = [];
+        $post = get_post( $post_id );
+        if( ! $post || empty( $post->post_content ) ) {
+            return $ids;
+        }
+
+        // This covers et_pb_image, et_pb_video, et_pb_slider, et_pb_fullwidth_image etc.
+        preg_match_all(
+            '/\[et_pb_[^\]]+\ssrc=["\']([^"\']+)["\']/',
+            $post->post_content,
+            $src_matches
+        );
+
+        // Also match background_url= which Divi uses for section backgrounds.
+        preg_match_all(
+            '/\[et_pb_[^\]]+\sbackground_url=["\']([^"\']+)["\']/',
+            $post->post_content,
+            $bg_matches
+        );
+
+        $urls = array_merge(
+            !empty( $src_matches[1] ) ? $src_matches[1] : [],
+            !empty( $bg_matches[1] ) ? $bg_matches[1] : []
+        );
+
+        foreach( array_unique( $urls ) as $url ) {
+            if( ! self::is_upload_url( $url ) ) {
+                continue;
+            }
+
+            $url = self::strip_size_suffix( $url );
+            $id = attachment_url_to_postid( $url );
+
+            if( $id > 0 ) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    private static function get_wpbakery_media( $post_id ) {
+        $ids = [];
+        $post = get_post( $post_id );
+
+        if( ! $post || empty( $post->post_content ) ) {
+            return $ids;
+        }
+
+        // Match image="42" — single image fields.
+        preg_match_all(
+            '/\[vc_[^\]]+\simage=["\'](\d+)["\']/',
+            $post->post_content,
+            $single_matches
+        );
+
+        // Match images="42,87,103" — gallery fields with comma separated IDs.
+        preg_match_all(
+            '/\[vc_[^\]]+\simages=["\']([0-9,]+)["\']/',
+            $post->post_content,
+            $gallery_matches
+        );
+
+        // Single Image ID
+        if(!empty($single_matches[1])){
+            foreach($single_matches[1] as $id_string) {
+                $parts = explode(',', $id_string);
+                foreach($parts as $id) {
+                    $ids[] = (int)  trim($id);
+                }
+            }
+        }
+
+        // Gallery Image IDs
+        if(!empty($gallery_matches[1])){
+            foreach($gallery_matches[1] as $id_string) {
+                $parts = explode(',', $id_string);
+                foreach($parts as $id) {
+                    $ids[] = (int)  trim($id);
+                }
+            }
+        }
+
+        return $ids;
+    }
+
     private static function get_featured_image( $post_id ) {
         $id = get_post_thumbnail_id( $post_id );
         return $id > 0 ? array( $id ) : array();
