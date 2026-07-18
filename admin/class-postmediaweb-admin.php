@@ -2,7 +2,7 @@
 /**
  * Admin UI — Settings page.
  *
- * @package PostMediaCleanupWebxperthub
+ * @package PostMediaCleanup
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,22 +22,22 @@ class Postmediaweb_Admin{
     private function __construct() {
         add_action( 'admin_menu', [ $this, 'add_menu' ] );
         add_action( 'admin_init', [ $this, 'register_settings' ] );
-        add_filter('plugin_action_links_' . plugin_basename( POSTMEDIAWEB_PLUGIN_DIR . 'post-media-cleanup-webxperthub.php' ), [$this, 'add_settings_link']);
+        add_filter('plugin_action_links_' . plugin_basename( POSTMEDIAWEB_PLUGIN_DIR . 'post-media-cleanup.php' ), [$this, 'add_settings_link']);
     }
 
     public function add_menu() {
         add_options_page(
-            __('Post Media Cleanup Webxperthub Settings', 'post-media-cleanup-webxperthub'),
-            __('Post Media Cleanup Webxperthub', 'post-media-cleanup-webxperthub'),
+            __('Post Media Cleanup Settings', 'post-media-cleanup'),
+            __('Post Media Cleanup', 'post-media-cleanup'),
             'manage_options',
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             [$this, 'render_page']
         );
     }
 
     public function add_settings_link( $links ) {
-        $url  = admin_url( 'options-general.php?page=post-media-cleanup-webxperthub' );
-        $link = '<a href="' . esc_url( $url ) . '">' . __( 'Settings', 'post-media-cleanup-webxperthub' ) . '</a>';
+        $url  = admin_url( 'options-general.php?page=post-media-cleanup' );
+        $link = '<a href="' . esc_url( $url ) . '">' . __( 'Settings', 'post-media-cleanup' ) . '</a>';
         array_unshift( $links, $link );
         return $links;
     }
@@ -51,72 +51,86 @@ class Postmediaweb_Admin{
 
         add_settings_section(
             'postmediaweb_section_general',
-            __('General', 'post-media-cleanup-webxperthub'),
+            __('General', 'post-media-cleanup'),
             '__return_empty_string',
-            'post-media-cleanup-webxperthub'
+            'post-media-cleanup'
         );
 
         add_settings_field(
             'postmediaweb_enabled',
-            __('Enable Deletion', 'post-media-cleanup-webxperthub'),
+            __('Enable Deletion', 'post-media-cleanup'),
             [$this, 'field_enabled'],
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             'postmediaweb_section_general'
         );
 
         add_settings_field(
             'postmediaweb_post_types',
-            __('Post Types', 'post-media-cleanup-webxperthub'),
+            __('Post Types', 'post-media-cleanup'),
             [$this, 'field_post_types'],
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             'postmediaweb_section_general'
         );
 
         add_settings_section(
             'postmediaweb_section_deletion',
-            __('What to Delete', 'post-media-cleanup-webxperthub'),
+            __('What to Delete', 'post-media-cleanup'),
             '__return_empty_string',
-            'post-media-cleanup-webxperthub'
+            'post-media-cleanup'
         );
 
         add_settings_field(
             'postmediaweb_delete_featured',
-            __('Featured Image', 'post-media-cleanup-webxperthub'),
+            __('Featured Image', 'post-media-cleanup'),
             [$this, 'field_delete_featured'],
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             'postmediaweb_section_deletion'
         );
 
         add_settings_field(
             'postmediaweb_delete_content',
-            __('Embeded Media', 'post-media-cleanup-webxperthub'),
+            __('Embeded Media', 'post-media-cleanup'),
             [$this, 'field_delete_content'],
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             'postmediaweb_section_deletion'
         );
 
         add_settings_field(
             'postmediaweb_delete_gallery',
-            __('Uploaded Attachment', 'post-media-cleanup-webxperthub'),
+            __('Uploaded Attachment', 'post-media-cleanup'),
             [$this, 'field_delete_gallery'],
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             'postmediaweb_section_deletion'
         );
 
         add_settings_field(
             'postmediaweb_skip_shared',
-            __('Skip Shared Media', 'post-media-cleanup-webxperthub'),
+            __('Skip Shared Media', 'post-media-cleanup'),
             [$this, 'field_skip_shared'],
-            'post-media-cleanup-webxperthub',
+            'post-media-cleanup',
             'postmediaweb_section_deletion'
         );
 
+        add_settings_field(
+            'postmediaweb_delete_pagebuilder',
+            __( 'Page Builder Media', 'post-media-cleanup' ),
+            [$this, 'field_delete_pagebuilder'],
+            'post-media-cleanup',
+            'postmediaweb_section_deletion'
+        );
+
+    }
+    
+    public function field_delete_pagebuilder() {
+        $val = Postmediaweb_Settings::get('delete_pagebuilder');
+        echo '<input type="checkbox" name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[delete_pagebuilder]" value="1" ' . checked( $val, true, false ) . '>';
+        echo '<p class="description">' . esc_html__( 'Delete media used in Elementor, Divi, and WPBakery page builder content.', 'post-media-cleanup' ) . '</p>';
     }
 
     public function field_enabled() {
         $val = Postmediaweb_Settings::get( 'enabled' );
         echo '<input type="checkbox" name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[enabled]" value="1" ' . checked( $val, true, false ) . '>';
-        echo '<p class="description">' . esc_html__( 'Uncheck to disable all deletion without deactivating the plugin.', 'post-media-cleanup-webxperthub' ) . '</p>';
+        echo '<p class="description">' . esc_html__( 'Uncheck to disable all deletion without deactivating the plugin.', 'post-media-cleanup' ) . '</p>';
     }
 
     public function field_post_types() {
@@ -141,19 +155,19 @@ class Postmediaweb_Admin{
     public function field_delete_content() {
         $val = Postmediaweb_Settings::get( 'delete_content_media' );
         echo '<input type="checkbox" name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[delete_content_media]" value="1" ' . checked( $val, true, false ) . '>';
-        echo '<p class="description">' . esc_html__( 'Images, PDFs, and files linked inside post content.', 'post-media-cleanup-webxperthub' ) . '</p>';
+        echo '<p class="description">' . esc_html__( 'Images, PDFs, and files linked inside post content.', 'post-media-cleanup' ) . '</p>';
     }
 
     public function field_delete_gallery() {
         $val = Postmediaweb_Settings::get( 'delete_gallery' );
         echo '<input type="checkbox" name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[delete_gallery]" value="1" ' . checked( $val, true, false ) . '>';
-        echo '<p class="description">' . esc_html__( 'All attachments uploaded directly to this post.', 'post-media-cleanup-webxperthub' ) . '</p>';
+        echo '<p class="description">' . esc_html__( 'All attachments uploaded directly to this post.', 'post-media-cleanup' ) . '</p>';
     }
 
     public function field_skip_shared() {
         $val = Postmediaweb_Settings::get( 'skip_shared' );
         echo '<input type="checkbox" name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[skip_shared]" value="1" ' . checked( $val, true, false ) . '>';
-        echo '<p class="description" style="color:#b32d2e;">' . esc_html__( 'Recommended: skip media that is also used by other posts.', 'post-media-cleanup-webxperthub' ) . '</p>';
+        echo '<p class="description" style="color:#b32d2e;">' . esc_html__( 'Recommended: skip media that is also used by other posts.', 'post-media-cleanup' ) . '</p>';
     }
 
     public function sanitize_settings( $input ) {
@@ -164,6 +178,7 @@ class Postmediaweb_Admin{
         $clean['delete_content_media'] = ! empty( $input['delete_content_media'] );
         $clean['delete_gallery']       = ! empty( $input['delete_gallery'] );
         $clean['skip_shared']          = ! empty( $input['skip_shared'] );
+        $clean['delete_pagebuilder']   = ! empty( $input['delete_pagebuilder'] );
 
         $valid_types        = array_keys( get_post_types( array( 'public' => true ) ) );
         $submitted          = isset( $input['post_types'] ) ? (array) $input['post_types'] : array();
@@ -184,12 +199,12 @@ class Postmediaweb_Admin{
         }
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'Post Media Cleanup Webxperthub', 'post-media-cleanup-webxperthub' ); ?></h1>
+            <h1><?php esc_html_e( 'Post Media Cleanup', 'post-media-cleanup' ); ?></h1>
             <form method="post" action="options.php">
                 <?php
                 settings_fields( 'postmediaweb_settings_group' );
                 wp_nonce_field( 'postmediaweb_settings_nonce' );
-                do_settings_sections( 'post-media-cleanup-webxperthub' );
+                do_settings_sections( 'post-media-cleanup' );
                 submit_button();
                 ?>
             </form>

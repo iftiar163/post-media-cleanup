@@ -2,7 +2,7 @@
 /**
  * Runs when the plugin is deleted from the Plugins screen.
  *
- * @package PostMediaCleanupWebxperthub
+ * @package PostMediaCleanup
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {

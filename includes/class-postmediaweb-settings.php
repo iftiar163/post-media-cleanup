@@ -2,7 +2,7 @@
 /**
  * Settings helper.
  *
- * @package PostMediaCleanupWebxperthub
+ * @package PostMediaCleanup
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -20,6 +20,7 @@ class Postmediaweb_Settings {
         'delete_gallery'       => true,
         'skip_shared'          => true,
         'post_types'           => array( 'post', 'page' ),
+        'delete_pagebuilder'   => true,
     );
 
     public static function get( $key ) {

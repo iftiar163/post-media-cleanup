@@ -2,7 +2,7 @@
 /**
  * Media Handler — finds all attachments for a post.
  *
- * @package PostMediaCleanupWebxperthub
+ * @package PostMediaCleanup
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -26,7 +26,85 @@ class Postmediaweb_Media_Handler {
             $ids = array_merge( $ids, self::get_child_attachments( $post_id ) );
         }
 
+        if( Postmediaweb_Settings::get( 'delete_pagebuilder' ) ) {
+            $ids = array_merge( $ids, self::get_pagebuilder_media( $post_id ) );
+        }
+
         return array_unique( array_filter( array_map( 'absint', $ids ) ) );
+    }
+
+    private static function get_pagebuilder_media( $post_id ) {
+        $ids = [];
+        // Each detector checks if the builder is active before doing anything.
+        // If the constant is not defined the builder is not installed — skip silently
+        // Implementation for retrieving page builder media
+        if( defined( 'ELEMENTOR_VERSION' ) ) {
+            $ids = array_merge($ids, self::get_elementor_media( $post_id ));
+        }
+
+        if( defined( 'ET_BUILDER_VERSION' ) ) {
+            $ids = array_merge($ids, self::get_divi_media( $post_id ));
+        }
+
+        if( defined( 'WPB_VC_VERSION' ) ) {
+            $ids = array_merge($ids, self::get_wpbakery_media( $post_id ));
+        }
+        return $ids;
+    }
+
+    private static function get_elementor_media( $post_id ) {
+        $ids = [];
+        $data = get_post_meta( $post_id, '_elementor_data', true );
+        if( empty($data) ) {
+            return $ids;
+        }
+
+        // Elementor stores JSON. Decode it into a PHP array.
+        $elements = json_decode( $data, true );
+        if( ! is_array($elements) ) {
+            return $ids;
+        }
+
+        // Elementor nests widgets inside sections inside columns.
+        // We need to walk the entire tree recursively to find every widget.
+        self::walk_elementor_elements( $elements, $ids );
+        return $ids;
+    }
+
+    private static function walk_elementor_elements( $elements, &$ids ) {
+        foreach( $elements as $element ){
+            if( ! empty($element['elements']) && is_array($element['elements']) ) {
+                self::walk_elementor_elements( $element['elements'], $ids );
+            }
+
+            if( empty($element['settings']) || ! is_array($element['settings']) ) {
+                continue;
+            }
+
+            $settings = $element['settings'];
+
+            foreach ( $settings as $key => $value ) {
+                    // Process each setting
+                    if( is_array( $value ) && isset($value['url']) && is_numeric($value['id']) && $value['id'] > 0 ) {
+                        $ids[] = (int) $value['id'];
+                    }
+
+                    if( is_array($value) && isset( $value['background_image']['id'] )) {
+                        $bg_id = (int) $value['background_image']['id'];
+                        if( $bg_id > 0 ) {
+                            $ids[] = $bg_id;
+                        }
+                    }
+
+                    if( is_array($value) && isset($value[0]) && is_array($value[0]) && isset($value[0]['id']) ) {
+                        foreach($value as $gallery_item) {
+                            if(isset($gallery_item['id']) && (int) $gallery_item['id'] > 0) {
+                                $ids[] = (int) $gallery_item['id'];
+                            }
+                        }
+                    }
+                }
+        }
     }
 
     private static function get_featured_image( $post_id ) {

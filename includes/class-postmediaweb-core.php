@@ -2,7 +2,7 @@
 /**
  * Core deletion engine.
  *
- * @package PostMediaCleanupWebxperthub
+ * @package PostMediaCleanup
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

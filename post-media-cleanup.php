@@ -1,7 +1,7 @@
 <?php
 /**
- * Plugin Name:       Post Media Cleanup Webxperthub
- * Plugin URI:        https://wordpress.org/plugins/post-media-cleanup-webxperthub/
+ * Plugin Name:       Post Media Cleanup
+ * Plugin URI:        https://wordpress.org/plugins/post-media-cleanup/
  * Description:       Automatically deletes all associated media files when a post is permanently deleted.
  * Version:           1.0.0
  * Requires at least: 5.0
@@ -10,10 +10,10 @@
  * Author URI:        https://iftiarhossain.com
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       post-media-cleanup-webxperthub
+ * Text Domain:       post-media-cleanup
  * Domain Path:       /languages
  *
- * @package PostMediaCleanupWebxperthub
+ * @package PostMediaCleanup
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

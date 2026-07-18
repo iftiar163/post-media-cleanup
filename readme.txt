@@ -1,4 +1,4 @@
-=== Post Media Cleanup Webxperthub ===
+=== Post Media Cleanup ===
 Contributors:      iftiarhossain
 Tags:              media, cleanup, delete, attachments, images
 Requires at least: 5.0
@@ -12,7 +12,7 @@ Automatically deletes all associated media files when a post is permanently dele
 
 == Description ==
 
-Post Media Cleanup Webxperthub removes orphaned media files from your server when you permanently delete a post.
+Post Media Cleanup removes orphaned media files from your server when you permanently delete a post.
 
 When you permanently delete a post, this plugin automatically finds and removes:
 
@@ -55,7 +55,7 @@ add_filter( 'postmediaweb_should_delete_attachment', function( $should, $att_id,
 
 1. Upload the plugin folder to /wp-content/plugins/
 2. Activate through the Plugins screen
-3. Go to Settings → Post Media Cleanup Webxperthub to configure
+3. Go to Settings → Post Media Cleanup to configure
 
 == Frequently Asked Questions ==
 
@@ -77,7 +77,7 @@ Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automa
 
 == Screenshots ==
 
-1. Settings page under Settings → Post Media Cleanup Webxperthub
+1. Settings page under Settings → Post Media Cleanup
 
 == Changelog ==
 
