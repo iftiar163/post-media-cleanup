@@ -25,6 +25,7 @@ define( 'POSTMEDIAWEB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'POSTMEDIAWEB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'POSTMEDIAWEB_OPTION_KEY', 'postmediaweb_settings' );
 
+require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-acf-handler.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-media-handler.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-settings.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-core.php';

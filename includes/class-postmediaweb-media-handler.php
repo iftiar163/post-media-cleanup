@@ -30,6 +30,10 @@ class Postmediaweb_Media_Handler {
             $ids = array_merge( $ids, self::get_pagebuilder_media( $post_id ) );
         }
 
+        if( Postmediaweb_Settings::get( 'delete_acf' ) ) {
+            $ids = array_merge( $ids, Postmediaweb_ACF_Handler::get_attachment_ids($post_id) );
+        }
+
         return array_unique( array_filter( array_map( 'absint', $ids ) ) );
     }
 
