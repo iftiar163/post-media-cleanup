@@ -21,6 +21,7 @@ class Postmediaweb_Settings {
         'skip_shared'          => true,
         'post_types'           => array( 'post', 'page' ),
         'delete_pagebuilder'   => true,
+        'delete_acf'           => true,
     );
 
     public static function get( $key ) {

@@ -119,6 +119,14 @@ class Postmediaweb_Admin{
             'postmediaweb_section_deletion'
         );
 
+        add_settings_field(
+            'postmediaweb_delete_acf',
+            __( 'ACF Media', 'post-media-cleanup' ),
+            [ $this, 'field_delete_acf' ],
+            'post-media-cleanup',
+            'postmediaweb_section_deletion'
+        );
+
     }
     
     public function field_delete_pagebuilder() {
@@ -170,6 +178,20 @@ class Postmediaweb_Admin{
         echo '<p class="description" style="color:#b32d2e;">' . esc_html__( 'Recommended: skip media that is also used by other posts.', 'post-media-cleanup' ) . '</p>';
     }
 
+    public function field_delete_acf() {
+         $val = Postmediaweb_Settings::get( 'delete_acf' );
+
+        echo '<input type="checkbox" name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[delete_acf]" value="1" ' . checked( $val, true, false ) . '>';
+        echo '<p class="description">' . esc_html__( 'Delete media stored in ACF image, file, and gallery fields (Free and Pro).', 'post-media-cleanup' ) . '</p>';
+
+        // Tell the user if ACF is not active right now.
+        if ( ! function_exists( 'acf_get_field_objects' ) ) {
+            echo '<p class="description" style="color:#b32d2e;">' . esc_html__( 'ACF is not currently active. This setting will have no effect until ACF is installed and activated.', 'post-media-cleanup' ) . '</p>';
+        }
+    }
+
+
+
     public function sanitize_settings( $input ) {
         $clean = array();
 
@@ -179,6 +201,7 @@ class Postmediaweb_Admin{
         $clean['delete_gallery']       = ! empty( $input['delete_gallery'] );
         $clean['skip_shared']          = ! empty( $input['skip_shared'] );
         $clean['delete_pagebuilder']   = ! empty( $input['delete_pagebuilder'] );
+        $clean['delete_acf']           = ! empty( $input['delete_acf'] );
 
         $valid_types        = array_keys( get_post_types( array( 'public' => true ) ) );
         $submitted          = isset( $input['post_types'] ) ? (array) $input['post_types'] : array();
