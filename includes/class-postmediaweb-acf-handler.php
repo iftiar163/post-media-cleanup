@@ -29,7 +29,13 @@ class Postmediaweb_ACF_Handler {
             return array();
         }
 
-        $fields = acf_get_field_objects( $post_id );
+        // format_value => false so image/file/gallery fields return raw
+        // IDs (or {ID:...} arrays) instead of ACF's formatted output
+        // (e.g. an <img> HTML string for some display formats) — and so
+        // we can read $field['value'] directly below instead of calling
+        // get_field() a second time for every field on every deleted
+        // post, which was previously doubling the query count.
+        $fields = acf_get_field_objects( $post_id, array( 'format_value' => false ) );
 
         if( empty($fields) || ! is_array($fields) ) {
             return array();
@@ -87,7 +93,7 @@ class Postmediaweb_ACF_Handler {
      */
 
     private static function get_simple_media_field( $field, $post_id ) {
-        $value = get_field( $field['name'], $post_id );
+        $value = isset( $field['value'] ) ? $field['value'] : null;
 
         if( empty($value) ) {
             return array();
@@ -121,7 +127,7 @@ class Postmediaweb_ACF_Handler {
      */
 
     private static function get_gallery_field( $field, $post_id ) {
-        $images = get_field( $field['name'], $post_id );
+        $images = isset( $field['value'] ) ? $field['value'] : null;
 
         if( empty( $images ) || ! is_array( $images ) ) {
             return array();
@@ -136,6 +142,13 @@ class Postmediaweb_ACF_Handler {
                 $ids[] = (int) $image['ID'];
             }
         }
+
+        // Previously missing: without this, the function implicitly
+        // returned null, and array_merge($ids, null) in
+        // get_attachment_ids() throws a fatal TypeError on PHP 8+ —
+        // meaning deleting ANY post with a populated ACF gallery field
+        // would crash mid-deletion.
+        return $ids;
     }
 
      /**
@@ -236,7 +249,7 @@ class Postmediaweb_ACF_Handler {
 
     private static function get_group_field( $field, $post_id ) {
         $ids = [];
-        $group = get_field( $field['name'], $post_id );
+        $group = isset( $field['value'] ) ? $field['value'] : null;
 
         if ( empty( $group ) || ! is_array( $group ) ) {
             return $ids;

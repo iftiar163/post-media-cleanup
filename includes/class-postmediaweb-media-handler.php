@@ -89,7 +89,7 @@ class Postmediaweb_Media_Handler {
 
             foreach ( $settings as $key => $value ) {
                     // Process each setting
-                    if( is_array( $value ) && isset($value['url']) && is_numeric($value['id']) && $value['id'] > 0 ) {
+                    if( is_array( $value ) && isset($value['url'], $value['id']) && is_numeric($value['id']) && $value['id'] > 0 ) {
                         $ids[] = (int) $value['id'];
                     }
 

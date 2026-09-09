@@ -1,9 +1,10 @@
 <?php
+
 /**
  * Plugin Name:       Post Media Cleanup
  * Plugin URI:        https://wordpress.org/plugins/post-media-cleanup/
  * Description:       Automatically deletes all associated media files when a post is permanently deleted.
- * Version:           1.0.0
+ * Version:           2.1.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Author:            Iftiar Hossain
@@ -16,25 +17,28 @@
  * @package PostMediaCleanup
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
+if (! defined('ABSPATH')) {
     exit;
 }
 
-define( 'POSTMEDIAWEB_VERSION', '1.0.0' );
-define( 'POSTMEDIAWEB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'POSTMEDIAWEB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'POSTMEDIAWEB_OPTION_KEY', 'postmediaweb_settings' );
+define('POSTMEDIAWEB_VERSION', '2.1.0');
+define('POSTMEDIAWEB_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('POSTMEDIAWEB_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('POSTMEDIAWEB_OPTION_KEY', 'postmediaweb_settings');
 
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-acf-handler.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-media-handler.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-settings.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-core.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'admin/class-postmediaweb-admin.php';
+require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-orphan-scanner.php';
+require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-ajax.php';
 
-register_activation_hook( __FILE__, 'postmediaweb_activate' );
-register_deactivation_hook( __FILE__, 'postmediaweb_deactivate' );
+register_activation_hook(__FILE__, 'postmediaweb_activate');
+register_deactivation_hook(__FILE__, 'postmediaweb_deactivate');
 
-function postmediaweb_activate() {
+function postmediaweb_activate()
+{
     $defaults = [
         'enabled'                   => true,
         'delete_featured'           => true,
@@ -43,20 +47,26 @@ function postmediaweb_activate() {
         'skip_shared'               => true,
         'post_types'                => ['post', 'page']
     ];
-    update_option( POSTMEDIAWEB_OPTION_KEY, $defaults );
+
+    // add_option() is a no-op if the option already exists — this
+    // preserves the user's saved settings across a deactivate/
+    // reactivate cycle instead of silently resetting them to defaults
+    // every time the plugin is reactivated.
+    add_option(POSTMEDIAWEB_OPTION_KEY, $defaults);
 }
 
-function postmediaweb_deactivate() {
+function postmediaweb_deactivate()
+{
     // No cleanup needed on deactivation, but you could choose to delete the settings if desired.
 }
 
 add_action('plugins_loaded', 'postmediaweb_init');
 
-function postmediaweb_init() {
+function postmediaweb_init()
+{
     Postmediaweb_Core::get_instance();
-
-    if(is_admin()) {
+    Postmediaweb_Ajax::get_instance();
+    if (is_admin()) {
         Postmediaweb_Admin::get_instance();
     }
 }
-
