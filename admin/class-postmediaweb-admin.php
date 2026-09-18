@@ -150,19 +150,117 @@ class Postmediaweb_Admin
         echo '<p class="description">' . esc_html__('Uncheck to disable all deletion without deactivating the plugin.', 'post-media-cleanup') . '</p>';
     }
 
-    public function field_post_types()
-    {
-        $current = (array) Postmediaweb_Settings::get('post_types');
-        $types   = get_post_types(array('public' => true), 'objects');
-        unset($types['attachment']);
+    public function field_post_types() {
+        $current = (array) Postmediaweb_Settings::get( 'post_types' );
+        $types   = get_post_types( array( 'public' => true ), 'objects' );
 
-        foreach ($types as $type) {
-            $checked = in_array($type->name, $current, true);
-            echo '<label style="display:block;margin-bottom:5px;">';
-            echo '<input type="checkbox" name="' . esc_attr(POSTMEDIAWEB_OPTION_KEY) . '[post_types][]" value="' . esc_attr($type->name) . '" ' . checked($checked, true, false) . '> ';
-            echo esc_html($type->label) . ' <code>(' . esc_html($type->name) . ')</code>';
-            echo '</label>';
+        // Remove post types that make no sense in this context.
+        unset( $types['attachment'] );
+
+        // Separate built-in from custom post types.
+        $builtin = array();
+        $custom  = array();
+
+        foreach ( $types as $type ) {
+            if ( $type->_builtin ) {
+                $builtin[ $type->name ] = $type;
+            } else {
+                $custom[ $type->name ] = $type;
+            }
         }
+
+        echo '<div class="pmc-post-types-wrap">';
+
+        // ── Built-in post types ───────────────────────────────────────────
+        if ( ! empty( $builtin ) ) {
+            echo '<p class="pmc-post-type-group-label">';
+            esc_html_e( 'WordPress Built-in', 'post-media-cleanup' );
+            echo '</p>';
+
+            foreach ( $builtin as $type ) {
+                $this->render_post_type_checkbox( $type, $current );
+            }
+        }
+
+        // ── Custom post types ─────────────────────────────────────────────
+        if ( ! empty( $custom ) ) {
+            echo '<p class="pmc-post-type-group-label pmc-post-type-group-label--custom">';
+            esc_html_e( 'Custom Post Types', 'post-media-cleanup' );
+            echo '</p>';
+
+            foreach ( $custom as $type ) {
+                $this->render_post_type_checkbox( $type, $current );
+            }
+        }
+
+        // No custom post types installed.
+        if ( empty( $custom ) ) {
+            echo '<p class="pmc-post-type-none">';
+            esc_html_e( 'No custom post types detected on this site.', 'post-media-cleanup' );
+            echo '</p>';
+        }
+
+        echo '</div>';
+
+        // Description.
+        echo '<p class="description">';
+        esc_html_e( 'Media will only be deleted when posts of the checked types are permanently deleted.', 'post-media-cleanup' );
+        echo '</p>';
+
+        // Warning if nothing is checked.
+        $nothing_checked = empty( $current );
+        echo '<p class="pmc-post-type-warning" style="' . ( $nothing_checked ? '' : 'display:none;' ) . '">';
+        esc_html_e( '⚠️ No post types selected. The plugin will not delete any media.', 'post-media-cleanup' );
+        echo '</p>';
+    }
+
+    private function render_post_type_checkbox( $type, $current ) {
+        $checked     = in_array( $type->name, $current, true );
+        $description = $this->get_post_type_description( $type->name );
+
+        echo '<label class="pmc-post-type-label">';
+
+        echo '<input
+            type="checkbox"
+            class="pmc-post-type-checkbox"
+            name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[post_types][]"
+            value="' . esc_attr( $type->name ) . '"
+            ' . checked( $checked, true, false ) . '
+        >';
+
+        echo '<span class="pmc-post-type-name">' . esc_html( $type->label ) . '</span>';
+
+        // Show slug as subtle secondary text — useful but not dominant.
+        echo '<span class="pmc-post-type-slug">' . esc_html( $type->name ) . '</span>';
+
+        // Short description if we have one.
+        if ( $description ) {
+            echo '<span class="pmc-post-type-desc">' . esc_html( $description ) . '</span>';
+        }
+
+        echo '</label>';
+    }
+
+    private function get_post_type_description( $post_type ) {
+        // Built-in descriptions that non-developers will understand.
+        $descriptions = array(
+            'post' => __( 'Standard blog posts', 'post-media-cleanup' ),
+            'page' => __( 'Static pages like About, Contact', 'post-media-cleanup' ),
+        );
+
+        // Known third party post types.
+        $third_party = array(
+            'product'          => __( 'WooCommerce products', 'post-media-cleanup' ),
+            'shop_order'       => __( 'WooCommerce orders', 'post-media-cleanup' ),
+            'tribe_events'     => __( 'The Events Calendar events', 'post-media-cleanup' ),
+            'portfolio'        => __( 'Portfolio items', 'post-media-cleanup' ),
+            'jetpack-portfolio' => __( 'Jetpack portfolio items', 'post-media-cleanup' ),
+            'download'         => __( 'Easy Digital Downloads products', 'post-media-cleanup' ),
+        );
+
+        $all = array_merge( $descriptions, $third_party );
+
+        return isset( $all[ $post_type ] ) ? $all[ $post_type ] : '';
     }
 
     public function field_delete_featured()
@@ -573,26 +671,116 @@ jQuery(function($) {
 JS;
     }
 
-    private function get_admin_css()
-    {
+    private function get_settings_js() {
+    return <<<'JS'
+        jQuery(function($) {
+
+            // Show warning if no post types are checked.
+            function updatePostTypeWarning() {
+                var anyChecked = $('.pmc-post-type-checkbox:checked').length > 0;
+                $('.pmc-post-type-warning').toggle( ! anyChecked );
+            }
+
+            // Run on every checkbox change.
+            $(document).on('change', '.pmc-post-type-checkbox', function() {
+                updatePostTypeWarning();
+            });
+
+            // Run once on page load in case settings were saved with none checked.
+            updatePostTypeWarning();
+        });
+        JS;
+    }
+
+    private function get_admin_css() {
         return '
-    .pmc-wrap { max-width: 900px; }
-    .pmc-tab-content { background: #fff; border: 1px solid #c3c4c7; border-top: none; padding: 24px; }
-    .pmc-cleanup-intro { font-size: 14px; color: #50575e; margin: 0 0 20px; }
-    .pmc-scan-actions { margin-bottom: 24px; }
-    .pmc-progress-wrap { margin: 20px 0; }
-    .pmc-progress-bar-track { background: #e0e0e0; border-radius: 4px; height: 10px; overflow: hidden; }
-    .pmc-progress-bar-fill { height: 100%; width: 0; background: #2271b1; border-radius: 4px; transition: width 0.08s linear; }
-    .pmc-progress-label { font-size: 13px; color: #50575e; margin-top: 8px; }
-    .pmc-results-header h3 { font-size: 16px; margin: 20px 0 12px; }
-    .pmc-orphans-table { margin-bottom: 20px; }
-    .pmc-orphans-table code { font-size: 12px; }
-    .pmc-delete-actions { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
-    .pmc-delete-btn { background: #b32d2e !important; border-color: #8a2222 !important; color: #fff !important; }
-    .pmc-delete-btn:hover { background: #8a2222 !important; }
-    .pmc-delete-warning { font-size: 12px; color: #b32d2e; }
-    .pmc-success-msg { font-size: 14px; color: #1d7e1d; background: #edfaed; border: 1px solid #8dbe8d; padding: 12px 16px; border-radius: 4px; }
-    .pmc-deleted-wrap { margin-top: 20px; }
-    ';
+        /* ── Existing styles ── */
+        .pmc-wrap { max-width: 900px; }
+        .pmc-tab-content { background: #fff; border: 1px solid #c3c4c7; border-top: none; padding: 24px; }
+        .pmc-cleanup-intro { font-size: 14px; color: #50575e; margin: 0 0 20px; }
+        .pmc-scan-actions { margin-bottom: 24px; }
+        .pmc-progress-wrap { margin: 20px 0; }
+        .pmc-progress-bar-track { background: #e0e0e0; border-radius: 4px; height: 10px; overflow: hidden; }
+        .pmc-progress-bar-fill { height: 100%; width: 0; background: #2271b1; border-radius: 4px; transition: width 0.08s linear; }
+        .pmc-progress-label { font-size: 13px; color: #50575e; margin-top: 8px; }
+        .pmc-results-header h3 { font-size: 16px; margin: 20px 0 12px; }
+        .pmc-orphans-table { margin-bottom: 20px; }
+        .pmc-orphans-table code { font-size: 12px; }
+        .pmc-delete-actions { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+        .pmc-delete-btn { background: #b32d2e !important; border-color: #8a2222 !important; color: #fff !important; }
+        .pmc-delete-btn:hover { background: #8a2222 !important; }
+        .pmc-delete-warning { font-size: 12px; color: #b32d2e; }
+        .pmc-success-msg { font-size: 14px; color: #1d7e1d; background: #edfaed; border: 1px solid #8dbe8d; padding: 12px 16px; border-radius: 4px; }
+        .pmc-deleted-wrap { margin-top: 20px; }
+
+        /* ── Post type selector ── */
+        .pmc-post-types-wrap {
+            border: 1px solid #c3c4c7;
+            border-radius: 4px;
+            padding: 4px 0;
+            max-width: 480px;
+            margin-bottom: 8px;
+        }
+        .pmc-post-type-group-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #8c8f94;
+            margin: 12px 14px 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #f0f0f1;
+        }
+        .pmc-post-type-group-label--custom {
+            margin-top: 4px;
+        }
+        .pmc-post-type-label {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 7px 14px;
+            cursor: pointer;
+            transition: background 0.1s;
+            border-radius: 3px;
+        }
+        .pmc-post-type-label:hover {
+            background: #f6f7f7;
+        }
+        .pmc-post-type-label input[type="checkbox"] {
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .pmc-post-type-name {
+            font-size: 13px;
+            color: #1d2327;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .pmc-post-type-slug {
+            font-size: 11px;
+            color: #8c8f94;
+            background: #f0f0f1;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            flex-shrink: 0;
+        }
+        .pmc-post-type-desc {
+            font-size: 12px;
+            color: #8c8f94;
+            font-style: italic;
+        }
+        .pmc-post-type-none {
+            font-size: 13px;
+            color: #8c8f94;
+            padding: 6px 14px;
+            font-style: italic;
+        }
+        .pmc-post-type-warning {
+            color: #b32d2e;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+        ';
     }
 }
