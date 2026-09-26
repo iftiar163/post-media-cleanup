@@ -1,14 +1,5 @@
 <?php
 
-/**
- * Orphan Scanner.
- *
- * Finds all media attachments not referenced anywhere across the
- * entire site.
- *
- * @package PostMediaCleanup
- */
-
 if (! defined('ABSPATH')) {
     exit;
 }
@@ -38,36 +29,15 @@ class Postmediaweb_Orphan_Scanner
     {
         global $wpdb;
 
-        // Large libraries can take a while and touch a lot of rows;
-        // reduce the chance of a hard timeout/OOM mid-scan. Best-effort —
-        // some hosts disable these, so both are silenced.
         wp_raise_memory_limit('admin');
         if (function_exists('set_time_limit')) {
             @set_time_limit(0); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.runtime_configuration_set_time_limit
         }
 
-        // ── Featured images — one query, small result set ────────────
-        // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-        $featured_ids = $wpdb->get_col(
-            "SELECT DISTINCT meta_value FROM {$wpdb->postmeta}
-             WHERE meta_key = '_thumbnail_id'
-             AND meta_value != ''"
-        );
-        $featured_ids = array_flip(array_map('absint', $featured_ids));
+        $reference_set = Postmediaweb_Reference_Checker::build_global_reference_set();
+        $referenced_ids = $reference_set['ids'];
+        $used_urls      = $reference_set['urls'];
 
-        // ── Build a set of every upload URL referenced in content ────
-        // Instead of concatenating every post's content into one giant
-        // string and running strpos() against it once PER ATTACHMENT
-        // (which is O(attachments × total content size) and can also
-        // exhaust memory holding the whole blob at once), we make a
-        // single pass over content in bounded batches, extract every
-        // upload-URL-looking substring with one regex pass per batch,
-        // and store the stripped versions in a hash set. Checking
-        // whether a given attachment is "used" is then an O(1)
-        // isset() lookup instead of a fresh full-text scan.
-        $used_urls = self::build_used_url_set();
-
-        // ── Walk attachments in batches, fields-only where possible ──
         $orphan_ids  = array();
         $orphan_data = array();
         $last_id     = 0;
@@ -92,13 +62,7 @@ class Postmediaweb_Orphan_Scanner
                 $id      = (int) $attachment->ID;
                 $last_id = max($last_id, $id);
 
-                // Skip if it belongs to a post that still genuinely
-                // exists. Previously this only checked "post_parent > 0",
-                // which permanently hides attachments whose parent post
-                // was removed by some other means (direct DB edits,
-                // an import tool, another plugin) — those are real
-                // orphans but would never surface. get_post_status()
-                // returns false for a nonexistent post.
+                // A nonzero parent may no longer exist, so only skip live parents.
                 if ($attachment->post_parent > 0) {
                     $parent_status = get_post_status($attachment->post_parent);
                     if ($parent_status && 'trash' !== $parent_status) {
@@ -106,7 +70,7 @@ class Postmediaweb_Orphan_Scanner
                     }
                 }
 
-                if (isset($featured_ids[$id])) {
+                if (isset($referenced_ids[$id])) {
                     continue;
                 }
 
@@ -122,9 +86,6 @@ class Postmediaweb_Orphan_Scanner
                     continue; // Used in content — not an orphan.
                 }
 
-                // Genuinely orphaned — only now do we pay for the
-                // extra per-row lookups needed to display it, instead
-                // of doing this for every attachment up front.
                 $orphan_ids[] = $id;
 
                 $file_path = get_attached_file($id);
@@ -151,72 +112,21 @@ class Postmediaweb_Orphan_Scanner
     }
 
     /**
-     * Scans post_content across the whole site in bounded batches and
-     * returns a hash set (as array keys) of every normalized upload URL
-     * found — both with and without a resize suffix (e.g. -150x150).
-     *
-     * @return array Hash set: normalized URL => true.
-     */
-    private static function build_used_url_set()
-    {
-        global $wpdb;
-
-        $upload_dir  = wp_upload_dir();
-        $base_url    = self::normalize_url($upload_dir['baseurl']);
-        $pattern     = '#' . preg_quote($base_url, '#') . '[^\s"\'\)\]<>]+#i';
-
-        $used_urls = array();
-        $last_id   = 0;
-
-        do {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-            $rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT ID, post_content FROM {$wpdb->posts}
-                     WHERE post_status NOT IN ('trash', 'auto-draft')
-                     AND post_type NOT IN ('attachment', 'revision')
-                     AND ID > %d
-                     ORDER BY ID ASC
-                     LIMIT %d",
-                    $last_id,
-                    self::BATCH_SIZE
-                )
-            );
-
-            foreach ($rows as $row) {
-                $last_id = max($last_id, (int) $row->ID);
-
-                if (empty($row->post_content)) {
-                    continue;
-                }
-
-                $normalized = self::normalize_url($row->post_content);
-
-                if (! preg_match_all($pattern, $normalized, $matches)) {
-                    continue;
-                }
-
-                foreach ($matches[0] as $match) {
-                    $match = strtok($match, '?'); // drop query strings
-                    $used_urls[$match] = true;
-                    $used_urls[self::strip_size_suffix($match)] = true;
-                }
-            }
-
-            // Batch content is discarded here as $rows goes out of
-            // scope on the next iteration — peak memory is bounded by
-            // one batch's worth of post_content, not the whole site's.
-            $fetched = count($rows);
-        } while ($fetched === self::BATCH_SIZE);
-
-        return $used_urls;
-    }
-
-    /**
      * Delete a list of attachments permanently.
      *
+     * A scan can take a while on a large library, and the site can
+     * change while it's running (someone adds the image to a new
+     * product gallery, an Elementor template gets published, etc).
+     * So each attachment is re-checked fresh, right here, immediately
+     * before it's actually deleted — not just relying on the scan
+     * result the browser is holding. Anything found to be referenced
+     * now is skipped rather than deleted.
+     *
      * @param int[] $ids  Array of attachment IDs to delete.
-     * @return int  Number of successfully deleted attachments.
+     * @return array {
+     *     @type int   $deleted Number of successfully deleted attachments.
+     *     @type int[] $skipped IDs skipped because they turned out to be referenced.
+     * }
      */
     public static function delete(array $ids)
     {
@@ -226,6 +136,7 @@ class Postmediaweb_Orphan_Scanner
         }
 
         $deleted = 0;
+        $skipped = array();
 
         foreach ($ids as $id) {
             $id = absint($id);
@@ -234,9 +145,13 @@ class Postmediaweb_Orphan_Scanner
                 continue;
             }
 
-            // Verify it is actually an attachment before deleting.
-            // This prevents someone sending arbitrary post IDs via AJAX.
+            // Reject arbitrary post IDs from AJAX requests.
             if ('attachment' !== get_post_type($id)) {
+                continue;
+            }
+
+            if (Postmediaweb_Reference_Checker::is_referenced($id)) {
+                $skipped[] = $id;
                 continue;
             }
 
@@ -247,7 +162,10 @@ class Postmediaweb_Orphan_Scanner
             }
         }
 
-        return $deleted;
+        return array(
+            'deleted' => $deleted,
+            'skipped' => $skipped,
+        );
     }
 
     /**

@@ -4,7 +4,7 @@ Tags:              media, cleanup, delete, attachments, images
 Requires at least: 5.0
 Tested up to:      7.0
 Requires PHP:      7.4
-Stable tag:        2.1.0
+Stable tag:        2.2.0
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -80,6 +80,15 @@ Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automa
 1. Settings page under Settings → Post Media Cleanup
 
 == Changelog ==
+
+= 2.2.0 =
+* Fixed: an image shared across multiple WooCommerce product galleries (`_product_image_gallery`) was deleted when only one of those products was removed, even though other products still used it.
+* Fixed: an image referenced only inside Elementor content/templates (`_elementor_data`) was deleted once its original post was removed, even though Elementor still referenced it elsewhere.
+* Fixed: "Skip Shared Media" only ever checked the featured-image meta and a literal URL match in post content — it now also checks WooCommerce product galleries, Elementor data, ACF image/file/gallery fields (including repeater and flexible-content sub-fields), term meta (e.g. category thumbnails), Gutenberg image/gallery blocks, `[gallery ids="..."]` and WPBakery shortcodes, and known media-holding site options (custom logo, site icon).
+* Fixed: the Bulk Orphan Cleanup scanner used the same narrow "featured image + literal URL" check and could flag genuinely-used media as orphaned for all the reasons above.
+* Changed: media-reference detection is conservative by design — a bare numeric value that happens to match an attachment ID (e.g. a generic custom field) is never treated as a confirmed reference on its own; only meta keys/structures positively identified as media storage (WooCommerce, Elementor, ACF field definitions, etc.) count.
+* Added: the Bulk Orphan Cleanup deletion step now re-checks each attachment immediately before deleting it, instead of trusting the scan result alone — anything found to have become referenced since the scan (e.g. the site changed while a large scan was running) is skipped rather than deleted, and the admin UI now reports how many were skipped for this reason.
+* Added: media-reference detection is now shared between the real-time "Skip Shared Media" check and the Bulk Orphan Cleanup scanner (`Postmediaweb_Reference_Checker`), so the two can no longer disagree with each other.
 
 = 2.1.0 =
 * Fixed: deleting a post with a populated ACF gallery field could crash with a fatal error on PHP 8+ (missing return value in the gallery field handler).

@@ -1,10 +1,4 @@
 <?php
-/**
- * Core deletion engine.
- *
- * @package PostMediaCleanup
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -99,54 +93,6 @@ class Postmediaweb_Core {
     }
 
     private function is_shared( $att_id, $excluding_post_id ) {
-        global $wpdb;
-        $cache_key = 'postmediaweb_featured_' . $att_id . '_' . $excluding_post_id;
-        $featured_count = wp_cache_get( $cache_key, 'postmediaweb_cache' );
-
-        if ( false === $featured_count ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $featured_count = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->postmeta}
-                WHERE meta_key   = '_thumbnail_id'
-                AND   meta_value = %d
-                AND   post_id   != %d",
-                $att_id,
-                $excluding_post_id
-            ) );
-            wp_cache_set( $cache_key, $featured_count, 'postmediaweb_cache', HOUR_IN_SECONDS );
-        }
-
-        if( $featured_count > 0 ) {
-            return true;
-        }
-
-        // Check 2 - Does its URL appear in another posts content?
-        $url = wp_get_attachment_url( $att_id );
-
-        if( ! $url ) {
-            return false;
-        }
-
-        $url_no_protocol = preg_replace( '#^https?://#', '', $url );
-        $url_base        = preg_replace( '/-\d+x\d+(\.[a-zA-Z0-9]+)$/', '$1', $url_no_protocol );
-
-        $cache_key_content = 'postmediaweb_content_' . md5( $url_base . '_' . $excluding_post_id );
-        $content_count = wp_cache_get( $cache_key_content, 'postmediaweb_cache' );
-
-        if ( false === $content_count ) {
-            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $content_count = (int) $wpdb->get_var( $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->posts}
-                WHERE  post_status NOT IN ('trash', 'auto-draft')
-                AND    ID          != %d
-                AND    post_content LIKE %s",
-                $excluding_post_id,
-                '%' . $wpdb->esc_like( $url_base ) . '%'
-            ) );
-            wp_cache_set( $cache_key_content, $content_count, 'postmediaweb_cache', HOUR_IN_SECONDS );
-        }
-
-        return $content_count > 0;
-
+        return Postmediaweb_Reference_Checker::is_referenced( $att_id, $excluding_post_id );
     }
 }

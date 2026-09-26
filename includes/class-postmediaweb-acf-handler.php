@@ -1,13 +1,4 @@
 <?php
-/**
- * ACF Media Handler.
- *
- * Finds all attachment IDs stored in ACF fields on a post.
- * Supports ACF Free and ACF Pro field types.
- *
- * @package PostMediaCleanup
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -29,12 +20,7 @@ class Postmediaweb_ACF_Handler {
             return array();
         }
 
-        // format_value => false so image/file/gallery fields return raw
-        // IDs (or {ID:...} arrays) instead of ACF's formatted output
-        // (e.g. an <img> HTML string for some display formats) — and so
-        // we can read $field['value'] directly below instead of calling
-        // get_field() a second time for every field on every deleted
-        // post, which was previously doubling the query count.
+        // Raw values avoid a second ACF lookup for every deleted post.
         $fields = acf_get_field_objects( $post_id, array( 'format_value' => false ) );
 
         if( empty($fields) || ! is_array($fields) ) {
@@ -50,14 +36,6 @@ class Postmediaweb_ACF_Handler {
 
         return $ids;
     }
-
-    /**
-     * Recursively collect attachment IDs from a field.
-     *
-     * @param array $field
-     * @param int $post_id
-     * @return int[]
-     */
 
     private static function extract_ids_from_field( $field, $post_id ) {
         $type = isset( $field['type'] ) ? $field['type'] : '';
@@ -84,14 +62,6 @@ class Postmediaweb_ACF_Handler {
         }
     }
 
-    /**
-     * Extract ID from a simple image or file field.
-     *
-     * @param array $field
-     * @param int   $post_id
-     * @return int[]
-     */
-
     private static function get_simple_media_field( $field, $post_id ) {
         $value = isset( $field['value'] ) ? $field['value'] : null;
 
@@ -115,17 +85,6 @@ class Postmediaweb_ACF_Handler {
         return array();
     }
 
-    /**
-     * Extract IDs from a gallery field.
-     *
-     * ACF gallery returns an array of images.
-     * Each image follows the same three formats as simple media fields.
-     *
-     * @param array $field
-     * @param int   $post_id
-     * @return int[]
-     */
-
     private static function get_gallery_field( $field, $post_id ) {
         $images = isset( $field['value'] ) ? $field['value'] : null;
 
@@ -143,21 +102,8 @@ class Postmediaweb_ACF_Handler {
             }
         }
 
-        // Previously missing: without this, the function implicitly
-        // returned null, and array_merge($ids, null) in
-        // get_attachment_ids() throws a fatal TypeError on PHP 8+ —
-        // meaning deleting ANY post with a populated ACF gallery field
-        // would crash mid-deletion.
         return $ids;
     }
-
-     /**
-     * Extract IDs from a Repeater field (ACF Pro).
-     *
-     * @param array $field
-     * @param int   $post_id
-     * @return int[]
-     */
 
      private static function get_repeater_field( $field, $post_id ) {
         $ids = array();
@@ -186,15 +132,6 @@ class Postmediaweb_ACF_Handler {
         
         return $ids;
      }
-
-     /**
-     * Extract IDs from a Flexible Content field (ACF Pro).
-     *
-     *
-     * @param array $field
-     * @param int   $post_id
-     * @return int[]
-     */
 
      private static function get_flexible_content_field( $field, $post_id ) {
         $ids = [];
@@ -239,14 +176,6 @@ class Postmediaweb_ACF_Handler {
         return $ids;
      }
 
-     /**
-     * Extract IDs from a Group field (ACF Pro).
-     *
-     * @param array $field
-     * @param int   $post_id
-     * @return int[]
-     */
-
     private static function get_group_field( $field, $post_id ) {
         $ids = [];
         $group = isset( $field['value'] ) ? $field['value'] : null;
@@ -269,14 +198,6 @@ class Postmediaweb_ACF_Handler {
 
         return $ids;
     }
-
-    /**
-     * Extract IDs from a raw value given its field type.
-     *
-     * @param string $type   ACF field type.
-     * @param mixed  $value  Raw field value.
-     * @return int[]
-     */
 
     private static function extract_ids_from_value( $type, $value ) {
 

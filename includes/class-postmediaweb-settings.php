@@ -1,10 +1,4 @@
 <?php
-/**
- * Settings helper.
- *
- * @package PostMediaCleanup
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }

@@ -1,10 +1,4 @@
 <?php
-/**
- * Media Handler — finds all attachments for a post.
- *
- * @package PostMediaCleanup
- */
-
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
@@ -39,9 +33,6 @@ class Postmediaweb_Media_Handler {
 
     private static function get_pagebuilder_media( $post_id ) {
         $ids = [];
-        // Each detector checks if the builder is active before doing anything.
-        // If the constant is not defined the builder is not installed — skip silently
-        // Implementation for retrieving page builder media
         if( defined( 'ELEMENTOR_VERSION' ) ) {
             $ids = array_merge($ids, self::get_elementor_media( $post_id ));
         }
@@ -63,14 +54,11 @@ class Postmediaweb_Media_Handler {
             return $ids;
         }
 
-        // Elementor stores JSON. Decode it into a PHP array.
         $elements = json_decode( $data, true );
         if( ! is_array($elements) ) {
             return $ids;
         }
 
-        // Elementor nests widgets inside sections inside columns.
-        // We need to walk the entire tree recursively to find every widget.
         self::walk_elementor_elements( $elements, $ids );
         return $ids;
     }
@@ -88,7 +76,6 @@ class Postmediaweb_Media_Handler {
             $settings = $element['settings'];
 
             foreach ( $settings as $key => $value ) {
-                    // Process each setting
                     if( is_array( $value ) && isset($value['url'], $value['id']) && is_numeric($value['id']) && $value['id'] > 0 ) {
                         $ids[] = (int) $value['id'];
                     }
@@ -118,14 +105,12 @@ class Postmediaweb_Media_Handler {
             return $ids;
         }
 
-        // This covers et_pb_image, et_pb_video, et_pb_slider, et_pb_fullwidth_image etc.
         preg_match_all(
             '/\[et_pb_[^\]]+\ssrc=["\']([^"\']+)["\']/',
             $post->post_content,
             $src_matches
         );
 
-        // Also match background_url= which Divi uses for section backgrounds.
         preg_match_all(
             '/\[et_pb_[^\]]+\sbackground_url=["\']([^"\']+)["\']/',
             $post->post_content,
@@ -161,21 +146,18 @@ class Postmediaweb_Media_Handler {
             return $ids;
         }
 
-        // Match image="42" — single image fields.
         preg_match_all(
             '/\[vc_[^\]]+\simage=["\'](\d+)["\']/',
             $post->post_content,
             $single_matches
         );
 
-        // Match images="42,87,103" — gallery fields with comma separated IDs.
         preg_match_all(
             '/\[vc_[^\]]+\simages=["\']([0-9,]+)["\']/',
             $post->post_content,
             $gallery_matches
         );
 
-        // Single Image ID
         if(!empty($single_matches[1])){
             foreach($single_matches[1] as $id_string) {
                 $parts = explode(',', $id_string);
@@ -185,7 +167,6 @@ class Postmediaweb_Media_Handler {
             }
         }
 
-        // Gallery Image IDs
         if(!empty($gallery_matches[1])){
             foreach($gallery_matches[1] as $id_string) {
                 $parts = explode(',', $id_string);

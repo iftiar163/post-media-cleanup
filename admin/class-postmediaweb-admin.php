@@ -1,11 +1,5 @@
 <?php
 
-/**
- * Admin UI — Settings page.
- *
- * @package PostMediaCleanup
- */
-
 if (! defined('ABSPATH')) {
     exit;
 }
@@ -154,10 +148,8 @@ class Postmediaweb_Admin
         $current = (array) Postmediaweb_Settings::get( 'post_types' );
         $types   = get_post_types( array( 'public' => true ), 'objects' );
 
-        // Remove post types that make no sense in this context.
         unset( $types['attachment'] );
 
-        // Separate built-in from custom post types.
         $builtin = array();
         $custom  = array();
 
@@ -171,7 +163,6 @@ class Postmediaweb_Admin
 
         echo '<div class="pmc-post-types-wrap">';
 
-        // ── Built-in post types ───────────────────────────────────────────
         if ( ! empty( $builtin ) ) {
             echo '<p class="pmc-post-type-group-label">';
             esc_html_e( 'WordPress Built-in', 'post-media-cleanup' );
@@ -182,7 +173,6 @@ class Postmediaweb_Admin
             }
         }
 
-        // ── Custom post types ─────────────────────────────────────────────
         if ( ! empty( $custom ) ) {
             echo '<p class="pmc-post-type-group-label pmc-post-type-group-label--custom">';
             esc_html_e( 'Custom Post Types', 'post-media-cleanup' );
@@ -193,7 +183,6 @@ class Postmediaweb_Admin
             }
         }
 
-        // No custom post types installed.
         if ( empty( $custom ) ) {
             echo '<p class="pmc-post-type-none">';
             esc_html_e( 'No custom post types detected on this site.', 'post-media-cleanup' );
@@ -202,12 +191,10 @@ class Postmediaweb_Admin
 
         echo '</div>';
 
-        // Description.
         echo '<p class="description">';
         esc_html_e( 'Media will only be deleted when posts of the checked types are permanently deleted.', 'post-media-cleanup' );
         echo '</p>';
 
-        // Warning if nothing is checked.
         $nothing_checked = empty( $current );
         echo '<p class="pmc-post-type-warning" style="' . ( $nothing_checked ? '' : 'display:none;' ) . '">';
         esc_html_e( '⚠️ No post types selected. The plugin will not delete any media.', 'post-media-cleanup' );
@@ -230,10 +217,8 @@ class Postmediaweb_Admin
 
         echo '<span class="pmc-post-type-name">' . esc_html( $type->label ) . '</span>';
 
-        // Show slug as subtle secondary text — useful but not dominant.
         echo '<span class="pmc-post-type-slug">' . esc_html( $type->name ) . '</span>';
 
-        // Short description if we have one.
         if ( $description ) {
             echo '<span class="pmc-post-type-desc">' . esc_html( $description ) . '</span>';
         }
@@ -242,13 +227,11 @@ class Postmediaweb_Admin
     }
 
     private function get_post_type_description( $post_type ) {
-        // Built-in descriptions that non-developers will understand.
         $descriptions = array(
             'post' => __( 'Standard blog posts', 'post-media-cleanup' ),
             'page' => __( 'Static pages like About, Contact', 'post-media-cleanup' ),
         );
 
-        // Known third party post types.
         $third_party = array(
             'product'          => __( 'WooCommerce products', 'post-media-cleanup' ),
             'shop_order'       => __( 'WooCommerce orders', 'post-media-cleanup' ),
@@ -297,7 +280,6 @@ class Postmediaweb_Admin
         echo '<input type="checkbox" name="' . esc_attr(POSTMEDIAWEB_OPTION_KEY) . '[delete_acf]" value="1" ' . checked($val, true, false) . '>';
         echo '<p class="description">' . esc_html__('Delete media stored in ACF image, file, and gallery fields (Free and Pro).', 'post-media-cleanup') . '</p>';
 
-        // Tell the user if ACF is not active right now.
         if (! function_exists('acf_get_field_objects')) {
             echo '<p class="description" style="color:#b32d2e;">' . esc_html__('ACF is not currently active. This setting will have no effect until ACF is installed and activated.', 'post-media-cleanup') . '</p>';
         }
@@ -335,7 +317,6 @@ class Postmediaweb_Admin
         if (! current_user_can('manage_options')) {
             return;
         }
-        // Read the active tab from URL — default to settings.
         $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'settings';
         $page_url   = admin_url('options-general.php?page=post-media-cleanup');
 ?>
@@ -457,16 +438,9 @@ class Postmediaweb_Admin
             return;
         }
 
-        // wp_add_inline_script() only actually prints its payload if the
-        // handle it's attached to is enqueued and output on the page.
-        // A bare Settings API page does not load jQuery by default, so
-        // without this explicit enqueue, none of the inline script below
-        // ever ran — the Scan/Delete buttons had no JavaScript attached.
+        // Inline scripts require an enqueued handle on this settings page.
         wp_enqueue_script('jquery');
 
-        // Pass data from PHP to JavaScript safely.
-        // wp_localize_script() is the correct WordPress way to do this —
-        // never hardcode URLs or nonces directly in JavaScript files.
         wp_add_inline_script(
             'jquery',
             'var PMC_Ajax = ' . wp_json_encode(array(
@@ -477,16 +451,15 @@ class Postmediaweb_Admin
                     'deleting'       => __('Deleting orphaned files...', 'post-media-cleanup'),
                     'found'          => __('orphaned files found', 'post-media-cleanup'),
                     'deleted'        => __('files permanently deleted.', 'post-media-cleanup'),
+                    'skipped'        => __('skipped — now referenced elsewhere', 'post-media-cleanup'),
                     'confirm_delete' => __('Are you sure? This will permanently delete all orphaned files. This cannot be undone.', 'post-media-cleanup'),
                     'error'          => __('Something went wrong. Please try again.', 'post-media-cleanup'),
                 ),
             )) . ';'
         );
 
-        // Inline the JavaScript — no separate file needed for this amount of code.
         wp_add_inline_script('jquery', $this->get_cleanup_js());
 
-        // Inline the CSS.
         wp_add_inline_style('wp-admin', $this->get_admin_css());
     }
 
@@ -511,7 +484,6 @@ jQuery(function($) {
     var collectedIds  = [];
     var progressTimer = null;
 
-    // ── Scan ─────────────────────────────────────────────────────────
     $scanBtn.on('click', function() {
         resetUI();
         startProgressBar();
@@ -548,7 +520,6 @@ jQuery(function($) {
         });
     });
 
-    // ── Delete ───────────────────────────────────────────────────────
     $deleteBtn.on('click', function() {
         if ( ! confirm(PMC_Ajax.strings.confirm_delete) ) {
             return;
@@ -572,7 +543,14 @@ jQuery(function($) {
                 }
 
                 $resultsWrap.hide();
-                $deletedCount.text(response.data.count + ' ' + PMC_Ajax.strings.deleted);
+
+                var message = response.data.count + ' ' + PMC_Ajax.strings.deleted;
+
+                if ( response.data.skipped && response.data.skipped.length ) {
+                    message += ' (' + response.data.skipped.length + ' ' + PMC_Ajax.strings.skipped + ')';
+                }
+
+                $deletedCount.text(message);
                 $deletedWrap.show();
                 collectedIds = [];
             },
@@ -583,18 +561,13 @@ jQuery(function($) {
         });
     });
 
-    // ── Progress bar ─────────────────────────────────────────────────
-    // Animates from 0 to 90 on a timer while AJAX runs.
-    // Jumps to 100 when response arrives.
-    // This gives professional feel without lying about real progress.
+    // Progress is simulated because the AJAX request has no incremental updates.
     function startProgressBar() {
         var pct = 0;
         $progressBar.css('width', '0%');
         $progressLbl.text(PMC_Ajax.strings.scanning);
 
         progressTimer = setInterval(function() {
-            // Easing: fast at start, slows down as it approaches 90.
-            // This feels natural — quick response then anticipation.
             var increment = (90 - pct) * 0.04;
             pct = Math.min(pct + increment, 90);
             $progressBar.css('width', pct.toFixed(1) + '%');
@@ -614,7 +587,6 @@ jQuery(function($) {
         }, 500);
     }
 
-    // ── Display results ───────────────────────────────────────────────
     function showResults(orphans) {
         $resultsWrap.show();
 
@@ -675,18 +647,15 @@ JS;
     return <<<'JS'
         jQuery(function($) {
 
-            // Show warning if no post types are checked.
             function updatePostTypeWarning() {
                 var anyChecked = $('.pmc-post-type-checkbox:checked').length > 0;
                 $('.pmc-post-type-warning').toggle( ! anyChecked );
             }
 
-            // Run on every checkbox change.
             $(document).on('change', '.pmc-post-type-checkbox', function() {
                 updatePostTypeWarning();
             });
 
-            // Run once on page load in case settings were saved with none checked.
             updatePostTypeWarning();
         });
         JS;
@@ -694,7 +663,6 @@ JS;
 
     private function get_admin_css() {
         return '
-        /* ── Existing styles ── */
         .pmc-wrap { max-width: 900px; }
         .pmc-tab-content { background: #fff; border: 1px solid #c3c4c7; border-top: none; padding: 24px; }
         .pmc-cleanup-intro { font-size: 14px; color: #50575e; margin: 0 0 20px; }
@@ -713,7 +681,6 @@ JS;
         .pmc-success-msg { font-size: 14px; color: #1d7e1d; background: #edfaed; border: 1px solid #8dbe8d; padding: 12px 16px; border-radius: 4px; }
         .pmc-deleted-wrap { margin-top: 20px; }
 
-        /* ── Post type selector ── */
         .pmc-post-types-wrap {
             border: 1px solid #c3c4c7;
             border-radius: 4px;

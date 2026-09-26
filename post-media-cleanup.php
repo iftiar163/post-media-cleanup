@@ -4,7 +4,7 @@
  * Plugin Name:       Post Media Cleanup
  * Plugin URI:        https://wordpress.org/plugins/post-media-cleanup/
  * Description:       Automatically deletes all associated media files when a post is permanently deleted.
- * Version:           2.1.0
+ * Version:           2.2.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Author:            Iftiar Hossain
@@ -21,13 +21,14 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('POSTMEDIAWEB_VERSION', '2.1.0');
+define('POSTMEDIAWEB_VERSION', '2.2.0');
 define('POSTMEDIAWEB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POSTMEDIAWEB_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POSTMEDIAWEB_OPTION_KEY', 'postmediaweb_settings');
 
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-acf-handler.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-media-handler.php';
+require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-reference-checker.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-settings.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-core.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'admin/class-postmediaweb-admin.php';
@@ -48,16 +49,12 @@ function postmediaweb_activate()
         'post_types'                => ['post', 'page']
     ];
 
-    // add_option() is a no-op if the option already exists — this
-    // preserves the user's saved settings across a deactivate/
-    // reactivate cycle instead of silently resetting them to defaults
-    // every time the plugin is reactivated.
+    // Preserve saved settings when the plugin is reactivated.
     add_option(POSTMEDIAWEB_OPTION_KEY, $defaults);
 }
 
 function postmediaweb_deactivate()
 {
-    // No cleanup needed on deactivation, but you could choose to delete the settings if desired.
 }
 
 add_action('plugins_loaded', 'postmediaweb_init');
