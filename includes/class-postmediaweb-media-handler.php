@@ -28,6 +28,16 @@ class Postmediaweb_Media_Handler {
             $ids = array_merge( $ids, Postmediaweb_ACF_Handler::get_attachment_ids($post_id) );
         }
 
+        if ( Postmediaweb_Settings::get( 'delete_woocommerce' ) ) {
+            $post = get_post( $post_id );
+            if ( $post && 'product' === $post->post_type ) {
+                $ids = array_merge(
+                    $ids,
+                    Postmediaweb_Woocommerce_Handler::get_attachment_ids( $post_id )
+                );
+            }
+        }
+
         return array_unique( array_filter( array_map( 'absint', $ids ) ) );
     }
 
@@ -198,60 +208,19 @@ class Postmediaweb_Media_Handler {
     private static function get_content_media( $post_id ) {
         $post = get_post( $post_id );
 
-        if( ! $post || empty( $post->post_content ) ) {
+        if ( ! $post ) {
             return array();
         }
 
-        $ids = array();
-        $urls = array();
+        $ids = self::extract_urls_from_content( $post->post_content );
 
-        libxml_use_internal_errors( true );
-
-        $dom = new DOMDocument();
-        $dom->loadHTML('<meta http-equiv="content-type" content="text/html; charset=utf-8">' . $post->post_content
-        );
-
-        libxml_clear_errors();
-
-        foreach( $dom->getElementsByTagName('img') as $img ) {
-            $src = $img->getAttribute('src');
-            if( $src ) {
-                $urls[] = self::strip_size_suffix( $src );
-            }
-
-            $srcset = $img->getAttribute('srcset');
-            if( $srcset ) {
-                foreach( explode( ',', $srcset ) as $part ) {
-                    $bits = preg_split('/\s+/', trim($part));
-                    if( !empty($bits[0]) ) {
-                        $urls[] = self::strip_size_suffix( $bits[0] );
-                    }
-                }
-            }
+        // Product excerpts are handled by the WooCommerce setting so that
+        // disabling product cleanup also disables short-description cleanup.
+        if ( 'product' !== $post->post_type ) {
+            $ids = array_merge( $ids, self::extract_urls_from_content( $post->post_excerpt ) );
         }
 
-        foreach( $dom->getElementsByTagName('a') as $anchor ) {
-            $href = $anchor->getAttribute('href');
-            if( $href && self::is_upload_url($href) ) {
-                $urls[] = $href;
-            }
-        }
-
-        foreach( array_unique( $urls ) as $url ) {
-            if( ! self::is_upload_url( $url ) ) {
-                continue;
-            }
-
-            $id = attachment_url_to_postid( $url );
-
-            if( $id > 0 ) {
-                $ids[] = $id;
-            }
-        }
-
-        return $ids;
-
-
+        return array_values( array_unique( $ids ) );
     }
 
     private static function strip_size_suffix( $url ) {
@@ -264,5 +233,61 @@ class Postmediaweb_Media_Handler {
         $base       = preg_replace( '#^https?://#', '//', $upload_dir['baseurl'] );
         $url_clean  = preg_replace( '#^https?://#', '//', $url );
         return strpos( $url_clean, $base ) === 0; 
+    }
+
+    public static function extract_urls_from_content( $content ) {
+
+        if ( empty( $content ) ) {
+            return array();
+        }
+
+        $ids  = array();
+        $urls = array();
+
+        libxml_use_internal_errors( true );
+
+        $dom = new DOMDocument();
+        $dom->loadHTML(
+            '<meta http-equiv="content-type" content="text/html; charset=utf-8">'
+            . $content
+        );
+
+        libxml_clear_errors();
+
+        foreach ( $dom->getElementsByTagName( 'img' ) as $img ) {
+            $src = $img->getAttribute( 'src' );
+            if ( $src ) {
+                $urls[] = self::strip_size_suffix( $src );
+            }
+
+            $srcset = $img->getAttribute( 'srcset' );
+            if ( $srcset ) {
+                foreach ( explode( ',', $srcset ) as $part ) {
+                    $bits = preg_split( '/\s+/', trim( $part ) );
+                    if ( ! empty( $bits[0] ) ) {
+                        $urls[] = self::strip_size_suffix( $bits[0] );
+                    }
+                }
+            }
+        }
+
+        foreach ( $dom->getElementsByTagName( 'a' ) as $anchor ) {
+            $href = $anchor->getAttribute( 'href' );
+            if ( $href && self::is_upload_url( $href ) ) {
+                $urls[] = $href;
+            }
+        }
+
+        foreach ( array_unique( $urls ) as $url ) {
+            if ( ! self::is_upload_url( $url ) ) {
+                continue;
+            }
+            $id = attachment_url_to_postid( $url );
+            if ( $id > 0 ) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
     }
 }

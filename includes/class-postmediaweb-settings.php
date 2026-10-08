@@ -16,6 +16,7 @@ class Postmediaweb_Settings {
         'post_types'           => array( 'post', 'page' ),
         'delete_pagebuilder'   => true,
         'delete_acf'           => true,
+        'delete_woocommerce'   => true,
     );
 
     public static function get( $key ) {

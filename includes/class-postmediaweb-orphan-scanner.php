@@ -46,12 +46,15 @@ class Postmediaweb_Orphan_Scanner
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
             $rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT ID, post_parent, post_mime_type, post_date
-                     FROM {$wpdb->posts}
-                     WHERE post_type = 'attachment'
-                     AND post_status != 'trash'
-                     AND ID > %d
-                     ORDER BY ID ASC
+                    "SELECT attachment.ID, attachment.post_parent, attachment.post_mime_type,
+                            attachment.post_date, parent.post_status AS parent_status
+                     FROM {$wpdb->posts} AS attachment
+                     LEFT JOIN {$wpdb->posts} AS parent
+                       ON parent.ID = attachment.post_parent
+                     WHERE attachment.post_type = 'attachment'
+                     AND attachment.post_status != 'trash'
+                     AND attachment.ID > %d
+                     ORDER BY attachment.ID ASC
                      LIMIT %d",
                     $last_id,
                     self::BATCH_SIZE
@@ -63,11 +66,8 @@ class Postmediaweb_Orphan_Scanner
                 $last_id = max($last_id, $id);
 
                 // A nonzero parent may no longer exist, so only skip live parents.
-                if ($attachment->post_parent > 0) {
-                    $parent_status = get_post_status($attachment->post_parent);
-                    if ($parent_status && 'trash' !== $parent_status) {
-                        continue;
-                    }
+                if (! empty($attachment->parent_status) && 'trash' !== $attachment->parent_status) {
+                    continue;
                 }
 
                 if (isset($referenced_ids[$id])) {

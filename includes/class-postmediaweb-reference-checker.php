@@ -187,7 +187,7 @@ class Postmediaweb_Reference_Checker
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
             $rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT ID, post_content FROM {$wpdb->posts}
+                    "SELECT ID, post_content, post_excerpt FROM {$wpdb->posts}
                      WHERE post_status NOT IN ('trash', 'auto-draft')
                      AND post_type NOT IN ('attachment', 'revision')
                      AND ID > %d
@@ -201,25 +201,27 @@ class Postmediaweb_Reference_Checker
             foreach ($rows as $row) {
                 $last_id = max($last_id, (int) $row->ID);
 
-                if (empty($row->post_content)) {
-                    continue;
-                }
-
-                // Undo JSON/URL-escaping (\/ => /) so escaped URLs inside
-                // Gutenberg block JSON still match the plain upload URL.
-                $unescaped = str_replace('\\/', '/', $row->post_content);
-                $normalized = self::normalize_url($unescaped);
-
-                if (preg_match_all($url_pattern, $normalized, $matches)) {
-                    foreach ($matches[0] as $match) {
-                        $match = strtok($match, '?');
-                        $used_urls[$match] = true;
-                        $used_urls[self::strip_size_suffix($match)] = true;
+                foreach (array($row->post_content, $row->post_excerpt) as $text) {
+                    if (empty($text)) {
+                        continue;
                     }
-                }
 
-                foreach (self::extract_content_ids($row->post_content) as $id) {
-                    $referenced[$id] = true;
+                    // Undo JSON/URL-escaping (\/ => /) so escaped URLs inside
+                    // Gutenberg block JSON still match the plain upload URL.
+                    $unescaped = str_replace('\\/', '/', $text);
+                    $normalized = self::normalize_url($unescaped);
+
+                    if (preg_match_all($url_pattern, $normalized, $matches)) {
+                        foreach ($matches[0] as $match) {
+                            $match = strtok($match, '?');
+                            $used_urls[$match] = true;
+                            $used_urls[self::strip_size_suffix($match)] = true;
+                        }
+                    }
+
+                    foreach (self::extract_content_ids($text) as $id) {
+                        $referenced[$id] = true;
+                    }
                 }
             }
 
@@ -353,8 +355,11 @@ class Postmediaweb_Reference_Checker
             "SELECT COUNT(*) FROM {$wpdb->posts}
              WHERE post_status NOT IN ('trash', 'auto-draft')
              AND ID != %d
-             AND (post_content LIKE %s OR post_content LIKE %s)",
+             AND (post_content LIKE %s OR post_content LIKE %s
+                  OR post_excerpt LIKE %s OR post_excerpt LIKE %s)",
             $exclude_post_id,
+            '%' . $wpdb->esc_like($url_base) . '%',
+            '%' . $wpdb->esc_like(str_replace('/', '\\/', $url_base)) . '%',
             '%' . $wpdb->esc_like($url_base) . '%',
             '%' . $wpdb->esc_like(str_replace('/', '\\/', $url_base)) . '%'
         ));
@@ -365,19 +370,25 @@ class Postmediaweb_Reference_Checker
 
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.NotPrepared
         $rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT ID, post_content FROM {$wpdb->posts}
+            "SELECT ID, post_content, post_excerpt FROM {$wpdb->posts}
              WHERE post_status NOT IN ('trash', 'auto-draft')
              AND ID != %d
-             AND (post_content LIKE %s OR post_content LIKE %s OR post_content LIKE %s)",
+             AND (post_content LIKE %s OR post_content LIKE %s OR post_content LIKE %s
+                  OR post_excerpt LIKE %s OR post_excerpt LIKE %s OR post_excerpt LIKE %s)",
             $exclude_post_id,
+            '%' . $wpdb->esc_like('ids="') . '%' . $wpdb->esc_like((string) $attachment_id) . '%',
+            '%' . $wpdb->esc_like('image="' . $attachment_id . '"') . '%',
+            '%' . $wpdb->esc_like((string) $attachment_id) . '%',
             '%' . $wpdb->esc_like('ids="') . '%' . $wpdb->esc_like((string) $attachment_id) . '%',
             '%' . $wpdb->esc_like('image="' . $attachment_id . '"') . '%',
             '%' . $wpdb->esc_like((string) $attachment_id) . '%'
         ));
 
         foreach ($rows as $row) {
-            if (in_array($attachment_id, self::extract_content_ids($row->post_content), true)) {
-                return true;
+            foreach (array($row->post_content, $row->post_excerpt) as $text) {
+                if (in_array($attachment_id, self::extract_content_ids($text), true)) {
+                    return true;
+                }
             }
         }
 

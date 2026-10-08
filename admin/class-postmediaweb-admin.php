@@ -128,6 +128,54 @@ class Postmediaweb_Admin
             'post-media-cleanup',
             'postmediaweb_section_deletion'
         );
+
+        // Only register the WooCommerce section if WooCommerce is active.
+        // No point showing WooCommerce options to users who don't have it.
+        if ( function_exists( 'wc_get_product' ) ) {
+            add_settings_section(
+                'pmc_section_woocommerce',
+                __( 'WooCommerce', 'post-media-cleanup' ),
+                array( $this, 'render_section_woocommerce' ),
+                'post-media-cleanup'
+            );
+
+            add_settings_field(
+                'pmc_delete_woocommerce',
+                __( 'Product Media', 'post-media-cleanup' ),
+                array( $this, 'field_delete_woocommerce' ),
+                'post-media-cleanup',
+                'pmc_section_woocommerce'
+            );
+        }
+    }
+
+    public function render_section_woocommerce() {
+        echo '<p>' . esc_html__(
+            'Control how media is handled when WooCommerce products are permanently deleted.',
+            'post-media-cleanup'
+        ) . '</p>';
+    }
+
+    public function field_delete_woocommerce() {
+        $val = Postmediaweb_Settings::get( 'delete_woocommerce' );
+
+        echo '<input type="checkbox"
+            name="' . esc_attr( POSTMEDIAWEB_OPTION_KEY ) . '[delete_woocommerce]"
+            value="1" ' . checked( $val, true, false ) . '>';
+
+        echo '<p class="description">' . esc_html__(
+            'When enabled, permanently deleting a product also deletes its product gallery images, short description media, and all variation images.',
+            'post-media-cleanup'
+        ) . '</p>';
+
+        // Show exactly what will be deleted so the user has no surprises.
+        echo '<ul class="pmc-woo-scope">
+            <li>✅ ' . esc_html__( 'Featured image', 'post-media-cleanup' ) . '</li>
+            <li>✅ ' . esc_html__( 'Product gallery images (_product_image_gallery)', 'post-media-cleanup' ) . '</li>
+            <li>✅ ' . esc_html__( 'Images in product description', 'post-media-cleanup' ) . '</li>
+            <li>✅ ' . esc_html__( 'Images in short description', 'post-media-cleanup' ) . '</li>
+            <li>✅ ' . esc_html__( 'All product variation images', 'post-media-cleanup' ) . '</li>
+        </ul>';
     }
 
     public function field_delete_pagebuilder()
@@ -298,6 +346,7 @@ class Postmediaweb_Admin
         $clean['skip_shared']          = ! empty($input['skip_shared']);
         $clean['delete_pagebuilder']   = ! empty($input['delete_pagebuilder']);
         $clean['delete_acf']           = ! empty($input['delete_acf']);
+        $clean['delete_woocommerce'] = ! empty( $input['delete_woocommerce'] );
 
         $valid_types        = array_keys(get_post_types(array('public' => true)));
         $submitted          = isset($input['post_types']) ? (array) $input['post_types'] : array();
@@ -748,6 +797,8 @@ JS;
             font-size: 12px;
             margin-top: 6px;
         }
+        .pmc-woo-scope { margin: 8px 0 0 4px; padding: 0; list-style: none; }
+        .pmc-woo-scope li { font-size: 12px; color: #50575e; margin-bottom: 3px; }
         ';
     }
 }

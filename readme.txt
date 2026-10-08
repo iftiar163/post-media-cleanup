@@ -4,7 +4,7 @@ Tags:              media, cleanup, delete, attachments, images
 Requires at least: 5.0
 Tested up to:      7.0
 Requires PHP:      7.4
-Stable tag:        2.2.0
+Stable tag:        2.3.0
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -80,6 +80,15 @@ Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automa
 1. Settings page under Settings → Post Media Cleanup
 
 == Changelog ==
+
+= 2.3.0 =
+* Added WooCommerce product gallery image collection on product delete
+* Added WooCommerce product variation image deletion
+* Added short description media scanning for all post types
+* Added dedicated WooCommerce settings section (visible only when WooCommerce is active)
+* Improved post type selector UI with Built-in vs Custom grouping
+* Added post type descriptions for known third party types
+* Added warning when no post types are selected
 
 = 2.2.0 =
 * Fixed: an image shared across multiple WooCommerce product galleries (`_product_image_gallery`) was deleted when only one of those products was removed, even though other products still used it.

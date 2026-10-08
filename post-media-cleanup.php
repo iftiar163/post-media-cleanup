@@ -4,7 +4,7 @@
  * Plugin Name:       Post Media Cleanup
  * Plugin URI:        https://wordpress.org/plugins/post-media-cleanup/
  * Description:       Automatically deletes all associated media files when a post is permanently deleted.
- * Version:           2.2.0
+ * Version:           2.3.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Author:            Iftiar Hossain
@@ -21,7 +21,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('POSTMEDIAWEB_VERSION', '2.2.0');
+define('POSTMEDIAWEB_VERSION', '2.3.0');
 define('POSTMEDIAWEB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POSTMEDIAWEB_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POSTMEDIAWEB_OPTION_KEY', 'postmediaweb_settings');
@@ -34,6 +34,7 @@ require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-core.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'admin/class-postmediaweb-admin.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-orphan-scanner.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-ajax.php';
+require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-woocommerce-handler.php';
 
 register_activation_hook(__FILE__, 'postmediaweb_activate');
 register_deactivation_hook(__FILE__, 'postmediaweb_deactivate');
