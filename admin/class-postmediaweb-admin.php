@@ -91,7 +91,7 @@ class Postmediaweb_Admin
 
         add_settings_field(
             'postmediaweb_delete_content',
-            __('Embeded Media', 'post-media-cleanup'),
+            __('Embedded Media', 'post-media-cleanup'),
             [$this, 'field_delete_content'],
             'post-media-cleanup',
             'postmediaweb_section_deletion'
@@ -337,28 +337,59 @@ class Postmediaweb_Admin
 
     public function sanitize_settings($input)
     {
+        if (! is_array($input)) {
+            $input = array();
+        }
+
+        $previous = get_option(POSTMEDIAWEB_OPTION_KEY, array());
+        if (! is_array($previous)) {
+            $previous = array();
+        }
+
         $clean = array();
 
-        $clean['enabled']              = ! empty($input['enabled']);
-        $clean['delete_featured']      = ! empty($input['delete_featured']);
-        $clean['delete_content_media'] = ! empty($input['delete_content_media']);
-        $clean['delete_gallery']       = ! empty($input['delete_gallery']);
-        $clean['skip_shared']          = ! empty($input['skip_shared']);
-        $clean['delete_pagebuilder']   = ! empty($input['delete_pagebuilder']);
-        $clean['delete_acf']           = ! empty($input['delete_acf']);
-        $clean['delete_woocommerce'] = ! empty( $input['delete_woocommerce'] );
+        foreach (array('enabled', 'delete_featured', 'delete_content_media', 'delete_gallery', 'skip_shared', 'delete_pagebuilder', 'delete_acf') as $key) {
+            $clean[$key] = ! empty($input[$key]);
+        }
 
-        $valid_types        = array_keys(get_post_types(array('public' => true)));
-        $submitted          = isset($input['post_types']) ? (array) $input['post_types'] : array();
+        // The WooCommerce checkbox is only rendered while WooCommerce is active. When it is not,
+        // keep the stored value instead of silently resetting it to "off" on every save.
+        if (function_exists('wc_get_product')) {
+            $clean['delete_woocommerce'] = ! empty($input['delete_woocommerce']);
+        } else {
+            $clean['delete_woocommerce'] = isset($previous['delete_woocommerce']) ? (bool) $previous['delete_woocommerce'] : true;
+        }
+
+        $valid_types = array_diff(
+            array_keys(get_post_types(array('public' => true))),
+            array('attachment')
+        );
+        $submitted = isset($input['post_types']) ? array_filter((array) $input['post_types'], 'is_scalar') : array();
+
+        // Selecting nothing must really mean "delete nothing". The settings screen promises this;
+        // the previous code silently re-enabled "post", so media of ordinary posts was still deleted.
         $clean['post_types'] = array_values(
             array_intersect(array_map('sanitize_key', $submitted), $valid_types)
         );
 
         if (empty($clean['post_types'])) {
-            $clean['post_types'] = array('post');
+            add_settings_error(
+                'postmediaweb_settings_group',
+                'pmc_no_post_types',
+                __('No post types are selected, so Post Media Cleanup will not delete any media.', 'post-media-cleanup'),
+                'warning'
+            );
         }
 
         return $clean;
+    }
+
+    private function get_active_tab()
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab switch.
+        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : 'settings';
+
+        return in_array($tab, array('settings', 'cleanup'), true) ? $tab : 'settings';
     }
 
     public function render_page()
@@ -366,7 +397,7 @@ class Postmediaweb_Admin
         if (! current_user_can('manage_options')) {
             return;
         }
-        $active_tab = isset($_GET['tab']) ? sanitize_key($_GET['tab']) : 'settings';
+        $active_tab = $this->get_active_tab();
         $page_url   = admin_url('options-general.php?page=post-media-cleanup');
 ?>
         <div class="wrap pmc-wrap">
@@ -487,29 +518,41 @@ class Postmediaweb_Admin
             return;
         }
 
-        // Inline scripts require an enqueued handle on this settings page.
-        wp_enqueue_script('jquery');
+        // Dedicated handles. Inline-only assets need a registered handle, and the
+        // previous code hung its CSS on "wp-admin", which is not guaranteed to be enqueued.
+        wp_register_style('pmc-admin', false, array(), POSTMEDIAWEB_VERSION);
+        wp_enqueue_style('pmc-admin');
+        wp_add_inline_style('pmc-admin', $this->get_admin_css());
 
-        wp_add_inline_script(
-            'jquery',
-            'var PMC_Ajax = ' . wp_json_encode(array(
-                'ajax_url' => admin_url('admin-ajax.php'),
-                'nonce'    => wp_create_nonce('pmc_orphan_nonce'),
-                'strings'  => array(
-                    'scanning'       => __('Scanning media library...', 'post-media-cleanup'),
-                    'deleting'       => __('Deleting orphaned files...', 'post-media-cleanup'),
-                    'found'          => __('orphaned files found', 'post-media-cleanup'),
-                    'deleted'        => __('files permanently deleted.', 'post-media-cleanup'),
-                    'skipped'        => __('skipped — now referenced elsewhere', 'post-media-cleanup'),
-                    'confirm_delete' => __('Are you sure? This will permanently delete all orphaned files. This cannot be undone.', 'post-media-cleanup'),
-                    'error'          => __('Something went wrong. Please try again.', 'post-media-cleanup'),
-                ),
-            )) . ';'
-        );
+        wp_register_script('pmc-admin', false, array('jquery'), POSTMEDIAWEB_VERSION, true);
+        wp_enqueue_script('pmc-admin');
 
-        wp_add_inline_script('jquery', $this->get_cleanup_js());
+        if ('cleanup' === $this->get_active_tab()) {
+            wp_add_inline_script(
+                'pmc-admin',
+                'var PMC_Ajax = ' . wp_json_encode(array(
+                    'ajax_url'   => admin_url('admin-ajax.php'),
+                    'nonce'      => wp_create_nonce('pmc_orphan_nonce'),
+                    'batch_size' => 25,
+                    'strings'    => array(
+                        'scanning'       => __('Scanning media library...', 'post-media-cleanup'),
+                        'deleting'       => __('Deleting orphaned files...', 'post-media-cleanup'),
+                        'found'          => __('orphaned files found', 'post-media-cleanup'),
+                        'delete_all'     => __('Delete All Orphaned Files', 'post-media-cleanup'),
+                        'deleted'        => __('files permanently deleted.', 'post-media-cleanup'),
+                        'skipped'        => __('skipped — now referenced elsewhere or no longer orphaned', 'post-media-cleanup'),
+                        'confirm_delete' => __('Are you sure? This will permanently delete all orphaned files. This cannot be undone.', 'post-media-cleanup'),
+                        'error'          => __('Something went wrong. Please try again.', 'post-media-cleanup'),
+                        'error_prefix'   => __('Error:', 'post-media-cleanup'),
+                    ),
+                )) . ';',
+                'before'
+            );
 
-        wp_add_inline_style('wp-admin', $this->get_admin_css());
+            wp_add_inline_script('pmc-admin', $this->get_cleanup_js());
+        } else {
+            wp_add_inline_script('pmc-admin', $this->get_settings_js());
+        }
     }
 
     private function get_cleanup_js()
@@ -543,8 +586,8 @@ jQuery(function($) {
             url:    PMC_Ajax.ajax_url,
             method: 'POST',
             data: {
-                action:   'pmc_scan_orphans',
-                nonce:    PMC_Ajax.nonce,
+                action: 'pmc_scan_orphans',
+                nonce:  PMC_Ajax.nonce
             },
             success: function(response) {
                 stopProgressBar(100);
@@ -554,10 +597,8 @@ jQuery(function($) {
                     return;
                 }
 
-                var orphans = response.data.orphans;
-                collectedIds = response.data.ids;
-
-                showResults(orphans);
+                collectedIds = response.data.ids || [];
+                showResults(response.data.orphans);
             },
             error: function() {
                 stopProgressBar(0);
@@ -569,53 +610,91 @@ jQuery(function($) {
         });
     });
 
+    // Deletion runs in small sequential batches. One giant request would be cut off by PHP's
+    // max_input_vars (default 1000) and by execution-time limits on large libraries.
     $deleteBtn.on('click', function() {
         if ( ! confirm(PMC_Ajax.strings.confirm_delete) ) {
             return;
         }
 
+        var queue   = collectedIds.slice();
+        var total   = queue.length;
+        var deleted = 0;
+        var skipped = 0;
+
         $deleteBtn.prop('disabled', true).text(PMC_Ajax.strings.deleting);
+        $progressBar.css('width', '0%');
+        $progressLbl.text(PMC_Ajax.strings.deleting);
+        $progressWrap.show();
 
-        $.ajax({
-            url:    PMC_Ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action:   'pmc_delete_orphans',
-                nonce:    PMC_Ajax.nonce,
-                ids:      collectedIds,
-            },
-            success: function(response) {
-                if ( ! response.success ) {
-                    showError(response.data || PMC_Ajax.strings.error);
-                    $deleteBtn.prop('disabled', false);
-                    return;
-                }
+        function finish() {
+            $progressWrap.hide();
+            $resultsWrap.hide();
 
-                $resultsWrap.hide();
+            var message = deleted + ' ' + PMC_Ajax.strings.deleted;
 
-                var message = response.data.count + ' ' + PMC_Ajax.strings.deleted;
-
-                if ( response.data.skipped && response.data.skipped.length ) {
-                    message += ' (' + response.data.skipped.length + ' ' + PMC_Ajax.strings.skipped + ')';
-                }
-
-                $deletedCount.text(message);
-                $deletedWrap.show();
-                collectedIds = [];
-            },
-            error: function() {
-                showError(PMC_Ajax.strings.error);
-                $deleteBtn.prop('disabled', false);
+            if ( skipped > 0 ) {
+                message += ' (' + skipped + ' ' + PMC_Ajax.strings.skipped + ')';
             }
-        });
+
+            $deletedCount.text(message);
+            $deletedWrap.show();
+            collectedIds = [];
+        }
+
+        function fail(message, batch) {
+            // Keep what has not been processed so the user can retry.
+            collectedIds = queue.concat(batch || []);
+            $deleteBtn.prop('disabled', false).text(PMC_Ajax.strings.delete_all);
+            showError(message || PMC_Ajax.strings.error);
+        }
+
+        function next() {
+            if ( ! queue.length ) {
+                finish();
+                return;
+            }
+
+            var batch = queue.splice(0, PMC_Ajax.batch_size);
+
+            $.ajax({
+                url:    PMC_Ajax.ajax_url,
+                method: 'POST',
+                data: {
+                    action: 'pmc_delete_orphans',
+                    nonce:  PMC_Ajax.nonce,
+                    ids:    batch
+                },
+                success: function(response) {
+                    if ( ! response.success ) {
+                        fail(response.data, batch);
+                        return;
+                    }
+
+                    deleted += parseInt(response.data.count, 10) || 0;
+                    skipped += ( response.data.skipped && response.data.skipped.length ) ? response.data.skipped.length : 0;
+
+                    var done = total - queue.length;
+                    $progressBar.css('width', Math.min(100, (done / total) * 100).toFixed(1) + '%');
+
+                    next();
+                },
+                error: function() {
+                    fail(PMC_Ajax.strings.error, batch);
+                }
+            });
+        }
+
+        next();
     });
 
-    // Progress is simulated because the AJAX request has no incremental updates.
+    // Progress is simulated during the scan because that single request has no incremental updates.
     function startProgressBar() {
         var pct = 0;
         $progressBar.css('width', '0%');
         $progressLbl.text(PMC_Ajax.strings.scanning);
 
+        clearInterval(progressTimer);
         progressTimer = setInterval(function() {
             var increment = (90 - pct) * 0.04;
             pct = Math.min(pct + increment, 90);
@@ -661,9 +740,7 @@ jQuery(function($) {
         });
 
         $orphansList.html(rows);
-        $deleteBtn.prop('disabled', false).text(
-            PMC_Ajax.strings.found.replace('orphaned', 'Delete all orphaned')
-        );
+        $deleteBtn.prop('disabled', false).text(PMC_Ajax.strings.delete_all);
     }
 
     function resetUI() {
@@ -678,9 +755,12 @@ jQuery(function($) {
     function showError(message) {
         $progressWrap.hide();
         $resultsWrap.show();
-        $resultsTitle.text('Error: ' + message);
+        $resultsTitle.text(PMC_Ajax.strings.error_prefix + ' ' + message);
         $noOrphans.hide();
-        $orphansFound.hide();
+        // Keep the table visible after a failed delete so the user can retry.
+        if ( ! collectedIds.length ) {
+            $orphansFound.hide();
+        }
     }
 
     // Prevent XSS when rendering server data into the DOM.
@@ -692,22 +772,21 @@ jQuery(function($) {
 JS;
     }
 
-    private function get_settings_js() {
-    return <<<'JS'
-        jQuery(function($) {
+    private function get_settings_js()
+    {
+        return <<<'JS'
+jQuery(function($) {
 
-            function updatePostTypeWarning() {
-                var anyChecked = $('.pmc-post-type-checkbox:checked').length > 0;
-                $('.pmc-post-type-warning').toggle( ! anyChecked );
-            }
+    function updatePostTypeWarning() {
+        var anyChecked = $('.pmc-post-type-checkbox:checked').length > 0;
+        $('.pmc-post-type-warning').toggle( ! anyChecked );
+    }
 
-            $(document).on('change', '.pmc-post-type-checkbox', function() {
-                updatePostTypeWarning();
-            });
+    $(document).on('change', '.pmc-post-type-checkbox', updatePostTypeWarning);
 
-            updatePostTypeWarning();
-        });
-        JS;
+    updatePostTypeWarning();
+});
+JS;
     }
 
     private function get_admin_css() {

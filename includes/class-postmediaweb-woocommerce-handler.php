@@ -93,30 +93,39 @@ class Postmediaweb_Woocommerce_Handler {
 
     private static function get_variation_images( $post_id ) {
 
-        // Get all variations for the product.
-        $variation_ids = get_posts( array(
-            'post_type'      => 'product_variation',
-            'post_parent'    => $post_id,
-            'post_status'    => 'any',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',        // IDs only — fastest query.
-            'no_found_rows'  => true,         // Skip COUNT(*).
-        ) );
+        $variation_ids = self::get_variation_ids( $post_id );
 
-        if( empty( $variation_ids ) ) {
+        if ( empty( $variation_ids ) ) {
             return array();
         }
 
         $ids = array();
 
-        // Reach each variation and get its featured image ID.
-        foreach( $variation_ids as $variation_id ) {
+        foreach ( $variation_ids as $variation_id ) {
             $thumb_id = (int) get_post_thumbnail_id( $variation_id );
             if ( $thumb_id > 0 ) {
                 $ids[] = $thumb_id;
             }
         }
+
         return $ids;
+    }
+
+    /**
+     * Get all variation post IDs, including variations already in the trash.
+     *
+     * @param int $post_id Product post ID.
+     * @return int[]
+     */
+    public static function get_variation_ids( $post_id ) {
+        return get_posts( array(
+            'post_type'      => 'product_variation',
+            'post_parent'    => $post_id,
+            'post_status'    => array_values( get_post_stati( array(), 'names' ) ),
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ) );
     }
 
 

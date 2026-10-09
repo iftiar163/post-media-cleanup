@@ -4,7 +4,7 @@ Tags:              media, cleanup, delete, attachments, images
 Requires at least: 5.0
 Tested up to:      7.0
 Requires PHP:      7.4
-Stable tag:        2.3.0
+Stable tag:        2.4.0
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,32 @@ Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automa
 
 == Changelog ==
 
+= 2.4.0 =
+* Fixed (data loss): Elementor images inside repeaters (slides, tabs, icon lists, nested containers) were not recognised as "in use", so a shared image could be deleted. Media controls are now found at any depth.
+* Fixed (data loss): images referenced from CSS `url(...)`, or after a domain change / http-https mix / CDN or S3 URL, were not recognised as "in use". Usage is now matched by upload-relative path, independent of host.
+* Fixed (data loss): the Bulk Orphan Cleanup flagged files used by widgets, theme mods, menus, page-builder meta, user meta and ACF fields on terms/users/options pages. These are now checked.
+* Fixed (data loss): the scanner flagged media belonging to posts in the Trash, so restoring a post could lose its images. Only attachments with no existing parent are now reported, and trashed posts count as references.
+* Fixed (data loss): a "scaled" image's original file, and WebP/AVIF siblings, are now treated as the same media.
+* Fixed: unchecking every post type silently re-enabled "post"; "none selected" now really deletes nothing.
+* Fixed: fatal error on WordPress 5.0 - 5.4 when deleting a post (hook argument added in 5.5).
+* Fixed: a failure inside the plugin could block a post from being deleted; errors are now contained.
+* Fixed: fatal error on hosts without the PHP DOM extension.
+* Fixed: bulk delete sent every ID in one request and was truncated by `max_input_vars`; it now runs in batches with a progress bar.
+* Fixed: the post-type warning script was never loaded; the admin CSS depended on an unreliable style handle; the delete button label was built by string-replacing a translatable string.
+* Fixed: the WooCommerce setting was reset to "off" on each save while WooCommerce was inactive.
+* Fixed: ACF repeater / flexible content / group handling now reads stored references (any nesting depth) instead of altering ACF's global loop state.
+* Fixed: libxml error handling is restored after parsing; video, audio, source, embed, object and iframe uploads are now collected from content.
+* Security: a logged-in user can only trigger deletion of media they are allowed to delete (filter `postmediaweb_enforce_capabilities`).
+* Security: bulk delete re-validates on the server that each ID is an attachment, still an orphan, still unreferenced and deletable by the user.
+* Security: hardened AJAX input handling (nested arrays no longer become ID 1, request size capped, `wp_unslash` applied).
+* Security: results of the `postmediaweb_attachment_ids_to_delete` filter are validated; `index.php` guards added.
+* Performance: ACF, Elementor, WooCommerce-gallery and content checks use narrow, targeted SQL instead of loading every row that contains a digit.
+
+= 2.3.1 =
+* Fixed: shared product-description images are preserved when content uses a resized image URL.
+* Fixed: a product's own variation-image references no longer prevent those variation images from being cleaned up.
+* Fixed: variation images are collected even when the variations have already been moved to the trash.
+
 = 2.3.0 =
 * Added WooCommerce product gallery image collection on product delete
 * Added WooCommerce product variation image deletion
@@ -119,6 +145,9 @@ Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automa
 * Initial release
 
 == Upgrade Notice ==
+
+= 2.4.0 =
+Important safety release: fixes several cases where in-use media could be deleted, and closes a privilege gap. Review the Bulk Orphan Cleanup results again after updating.
 
 = 1.0.0 =
 Initial release

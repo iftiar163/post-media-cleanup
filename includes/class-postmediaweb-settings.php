@@ -21,7 +21,14 @@ class Postmediaweb_Settings {
 
     public static function get( $key ) {
         if ( null === self::$cache ) {
-            $saved       = get_option( POSTMEDIAWEB_OPTION_KEY, array() );
+            $saved = get_option( POSTMEDIAWEB_OPTION_KEY, array() );
+
+            // A corrupted / non-array option must fall back to defaults instead of
+            // being passed to wp_parse_args() (which would parse a string as a query string).
+            if ( ! is_array( $saved ) ) {
+                $saved = array();
+            }
+
             self::$cache = wp_parse_args( $saved, self::$defaults );
         }
 
@@ -30,5 +37,13 @@ class Postmediaweb_Settings {
 
     public static function is_enabled() {
         return (bool) self::get( 'enabled' );
+    }
+
+    /**
+     * Forget the in-memory copy. Hooked to option add/update so that a save made during the
+     * same request (or by another plugin) is picked up immediately.
+     */
+    public static function clear_cache() {
+        self::$cache = null;
     }
 }

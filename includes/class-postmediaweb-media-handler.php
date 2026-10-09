@@ -4,28 +4,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Postmediaweb_Media_Handler {
-    
-    public static function get_all_attachment_ids( $post_id ) {
-        $ids = [];
 
-        if( Postmediaweb_Settings::get( 'delete_featured' ) ) {
+    /**
+     * Collect every attachment ID that belongs to a post, honouring the plugin settings.
+     *
+     * @param int $post_id
+     * @return int[]
+     */
+    public static function get_all_attachment_ids( $post_id ) {
+        $ids = array();
+
+        if ( Postmediaweb_Settings::get( 'delete_featured' ) ) {
             $ids = array_merge( $ids, self::get_featured_image( $post_id ) );
         }
 
-        if( Postmediaweb_Settings::get( 'delete_content_media' ) ) {
+        if ( Postmediaweb_Settings::get( 'delete_content_media' ) ) {
             $ids = array_merge( $ids, self::get_content_media( $post_id ) );
         }
 
-        if( Postmediaweb_Settings::get( 'delete_gallery' ) ) {
+        if ( Postmediaweb_Settings::get( 'delete_gallery' ) ) {
             $ids = array_merge( $ids, self::get_child_attachments( $post_id ) );
         }
 
-        if( Postmediaweb_Settings::get( 'delete_pagebuilder' ) ) {
+        if ( Postmediaweb_Settings::get( 'delete_pagebuilder' ) ) {
             $ids = array_merge( $ids, self::get_pagebuilder_media( $post_id ) );
         }
 
-        if( Postmediaweb_Settings::get( 'delete_acf' ) ) {
-            $ids = array_merge( $ids, Postmediaweb_ACF_Handler::get_attachment_ids($post_id) );
+        if ( Postmediaweb_Settings::get( 'delete_acf' ) ) {
+            $ids = array_merge( $ids, Postmediaweb_ACF_Handler::get_attachment_ids( $post_id ) );
         }
 
         if ( Postmediaweb_Settings::get( 'delete_woocommerce' ) ) {
@@ -38,80 +44,49 @@ class Postmediaweb_Media_Handler {
             }
         }
 
-        return array_unique( array_filter( array_map( 'absint', $ids ) ) );
+        return array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
     }
 
     private static function get_pagebuilder_media( $post_id ) {
-        $ids = [];
-        if( defined( 'ELEMENTOR_VERSION' ) ) {
-            $ids = array_merge($ids, self::get_elementor_media( $post_id ));
+        $ids = array();
+
+        if ( defined( 'ELEMENTOR_VERSION' ) ) {
+            $ids = array_merge( $ids, self::get_elementor_media( $post_id ) );
         }
 
-        if( defined( 'ET_BUILDER_VERSION' ) ) {
-            $ids = array_merge($ids, self::get_divi_media( $post_id ));
+        if ( defined( 'ET_BUILDER_VERSION' ) ) {
+            $ids = array_merge( $ids, self::get_divi_media( $post_id ) );
         }
 
-        if( defined( 'WPB_VC_VERSION' ) ) {
-            $ids = array_merge($ids, self::get_wpbakery_media( $post_id ));
+        if ( defined( 'WPB_VC_VERSION' ) ) {
+            $ids = array_merge( $ids, self::get_wpbakery_media( $post_id ) );
         }
+
         return $ids;
     }
 
+    /**
+     * Elementor media for a post.
+     *
+     * Delegates to the shared extractor so that repeater items (slides, tabs, icon
+     * lists ...), galleries and backgrounds nested at any depth are all found, and so
+     * the "what does this post use" and "is this still used elsewhere" answers always agree.
+     */
     private static function get_elementor_media( $post_id ) {
-        $ids = [];
         $data = get_post_meta( $post_id, '_elementor_data', true );
-        if( empty($data) ) {
-            return $ids;
+
+        if ( empty( $data ) ) {
+            return array();
         }
 
-        $elements = json_decode( $data, true );
-        if( ! is_array($elements) ) {
-            return $ids;
-        }
-
-        self::walk_elementor_elements( $elements, $ids );
-        return $ids;
-    }
-
-    private static function walk_elementor_elements( $elements, &$ids ) {
-        foreach( $elements as $element ){
-            if( ! empty($element['elements']) && is_array($element['elements']) ) {
-                self::walk_elementor_elements( $element['elements'], $ids );
-            }
-
-            if( empty($element['settings']) || ! is_array($element['settings']) ) {
-                continue;
-            }
-
-            $settings = $element['settings'];
-
-            foreach ( $settings as $key => $value ) {
-                    if( is_array( $value ) && isset($value['url'], $value['id']) && is_numeric($value['id']) && $value['id'] > 0 ) {
-                        $ids[] = (int) $value['id'];
-                    }
-
-                    if( is_array($value) && isset( $value['background_image']['id'] )) {
-                        $bg_id = (int) $value['background_image']['id'];
-                        if( $bg_id > 0 ) {
-                            $ids[] = $bg_id;
-                        }
-                    }
-
-                    if( is_array($value) && isset($value[0]) && is_array($value[0]) && isset($value[0]['id']) ) {
-                        foreach($value as $gallery_item) {
-                            if(isset($gallery_item['id']) && (int) $gallery_item['id'] > 0) {
-                                $ids[] = (int) $gallery_item['id'];
-                            }
-                        }
-                    }
-                }
-        }
+        return Postmediaweb_Reference_Checker::extract_elementor_ids( $data );
     }
 
     private static function get_divi_media( $post_id ) {
-        $ids = [];
+        $ids  = array();
         $post = get_post( $post_id );
-        if( ! $post || empty( $post->post_content ) ) {
+
+        if ( ! $post || empty( $post->post_content ) ) {
             return $ids;
         }
 
@@ -128,19 +103,18 @@ class Postmediaweb_Media_Handler {
         );
 
         $urls = array_merge(
-            !empty( $src_matches[1] ) ? $src_matches[1] : [],
-            !empty( $bg_matches[1] ) ? $bg_matches[1] : []
+            ! empty( $src_matches[1] ) ? $src_matches[1] : array(),
+            ! empty( $bg_matches[1] ) ? $bg_matches[1] : array()
         );
 
-        foreach( array_unique( $urls ) as $url ) {
-            if( ! self::is_upload_url( $url ) ) {
+        foreach ( array_unique( $urls ) as $url ) {
+            if ( ! self::is_upload_url( $url ) ) {
                 continue;
             }
 
-            $url = self::strip_size_suffix( $url );
-            $id = attachment_url_to_postid( $url );
+            $id = self::url_to_attachment_id( $url );
 
-            if( $id > 0 ) {
+            if ( $id > 0 ) {
                 $ids[] = $id;
             }
         }
@@ -149,39 +123,19 @@ class Postmediaweb_Media_Handler {
     }
 
     private static function get_wpbakery_media( $post_id ) {
-        $ids = [];
+        $ids  = array();
         $post = get_post( $post_id );
 
-        if( ! $post || empty( $post->post_content ) ) {
+        if ( ! $post || empty( $post->post_content ) ) {
             return $ids;
         }
 
-        preg_match_all(
-            '/\[vc_[^\]]+\simage=["\'](\d+)["\']/',
-            $post->post_content,
-            $single_matches
-        );
-
-        preg_match_all(
-            '/\[vc_[^\]]+\simages=["\']([0-9,]+)["\']/',
-            $post->post_content,
-            $gallery_matches
-        );
-
-        if(!empty($single_matches[1])){
-            foreach($single_matches[1] as $id_string) {
-                $parts = explode(',', $id_string);
-                foreach($parts as $id) {
-                    $ids[] = (int)  trim($id);
-                }
-            }
-        }
-
-        if(!empty($gallery_matches[1])){
-            foreach($gallery_matches[1] as $id_string) {
-                $parts = explode(',', $id_string);
-                foreach($parts as $id) {
-                    $ids[] = (int)  trim($id);
+        foreach ( array( 'image', 'images' ) as $attribute ) {
+            if ( preg_match_all( '/\[vc_[^\]]+\s' . $attribute . '=["\']([0-9,\s]+)["\']/', $post->post_content, $matches ) ) {
+                foreach ( $matches[1] as $id_string ) {
+                    foreach ( explode( ',', $id_string ) as $id ) {
+                        $ids[] = (int) trim( $id );
+                    }
                 }
             }
         }
@@ -190,19 +144,21 @@ class Postmediaweb_Media_Handler {
     }
 
     private static function get_featured_image( $post_id ) {
-        $id = get_post_thumbnail_id( $post_id );
+        $id = (int) get_post_thumbnail_id( $post_id );
         return $id > 0 ? array( $id ) : array();
     }
 
     private static function get_child_attachments( $post_id ) {
-        return get_posts([
-            'post_type'      => 'attachment',
-            'post_parent'    => $post_id,
-            'post_status'    => 'any',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'no_found_rows'  => true,
-        ]);
+        return get_posts( array(
+            'post_type'        => 'attachment',
+            'post_parent'      => $post_id,
+            // 'any' skips the trash status, which attachments use when MEDIA_TRASH is enabled.
+            'post_status'      => array( 'any', 'trash' ),
+            'posts_per_page'   => -1,
+            'fields'           => 'ids',
+            'no_found_rows'    => true,
+            'suppress_filters' => true,
+        ) );
     }
 
     private static function get_content_media( $post_id ) {
@@ -223,71 +179,159 @@ class Postmediaweb_Media_Handler {
         return array_values( array_unique( $ids ) );
     }
 
+    /**
+     * Remove a "-300x200" size suffix and any query string / fragment.
+     */
     private static function strip_size_suffix( $url ) {
-        $url = strtok( $url, '?' );
-        return preg_replace('/-\d+x\d+(\.[a-zA-Z0-9]+)$/', '$1', $url );
+        $url = self::clean_url( $url );
+        return preg_replace( '/-\d+x\d+(\.[a-zA-Z0-9]+)$/', '$1', $url );
+    }
+
+    /**
+     * Remove query string and fragment.
+     */
+    private static function clean_url( $url ) {
+        return preg_replace( '/[?#].*$/', '', (string) $url );
     }
 
     private static function is_upload_url( $url ) {
-        $upload_dir = wp_upload_dir();
+        $upload_dir = wp_upload_dir( null, false );
         $base       = preg_replace( '#^https?://#', '//', $upload_dir['baseurl'] );
         $url_clean  = preg_replace( '#^https?://#', '//', $url );
-        return strpos( $url_clean, $base ) === 0; 
+        return 0 === strpos( $url_clean, $base );
     }
 
-    public static function extract_urls_from_content( $content ) {
+    /**
+     * Resolve an upload URL to an attachment ID.
+     *
+     * The URL is tried exactly as written first so a file that genuinely is named
+     * like "banner-1920x1080.jpg" still resolves; only then is a "-WxH" size suffix stripped.
+     */
+    private static function url_to_attachment_id( $url ) {
+        $clean = self::clean_url( $url );
+        $id    = (int) attachment_url_to_postid( $clean );
 
-        if ( empty( $content ) ) {
-            return array();
+        if ( $id > 0 ) {
+            return $id;
         }
 
-        $ids  = array();
+        $unsized = self::strip_size_suffix( $clean );
+
+        if ( $unsized !== $clean ) {
+            return (int) attachment_url_to_postid( $unsized );
+        }
+
+        return 0;
+    }
+
+    /**
+     * Pull every candidate media URL out of an HTML fragment.
+     *
+     * Uses DOMDocument when the PHP DOM extension exists (it is optional on some hosts) and
+     * falls back to a regex scan otherwise, so deleting a post can never fatally error here.
+     *
+     * @param string $content
+     * @return string[]
+     */
+    private static function collect_urls( $content ) {
         $urls = array();
 
-        libxml_use_internal_errors( true );
-
-        $dom = new DOMDocument();
-        $dom->loadHTML(
-            '<meta http-equiv="content-type" content="text/html; charset=utf-8">'
-            . $content
+        $attributes = array(
+            'img'    => array( 'src', 'data-src', 'srcset', 'data-srcset' ),
+            'a'      => array( 'href' ),
+            'video'  => array( 'src', 'poster' ),
+            'audio'  => array( 'src' ),
+            'source' => array( 'src', 'srcset' ),
+            'embed'  => array( 'src' ),
+            'object' => array( 'data' ),
+            'iframe' => array( 'src' ),
         );
 
-        libxml_clear_errors();
+        if ( class_exists( 'DOMDocument' ) ) {
+            $previous = libxml_use_internal_errors( true );
 
-        foreach ( $dom->getElementsByTagName( 'img' ) as $img ) {
-            $src = $img->getAttribute( 'src' );
-            if ( $src ) {
-                $urls[] = self::strip_size_suffix( $src );
+            $dom = new DOMDocument();
+            $dom->loadHTML(
+                '<meta http-equiv="content-type" content="text/html; charset=utf-8">' . $content,
+                LIBXML_NONET
+            );
+
+            libxml_clear_errors();
+            libxml_use_internal_errors( $previous );
+
+            foreach ( $attributes as $tag => $attrs ) {
+                foreach ( $dom->getElementsByTagName( $tag ) as $node ) {
+                    foreach ( $attrs as $attr ) {
+                        $value = $node->getAttribute( $attr );
+                        if ( '' !== $value ) {
+                            $urls = array_merge( $urls, self::split_attribute_urls( $attr, $value ) );
+                        }
+                    }
+                }
             }
 
-            $srcset = $img->getAttribute( 'srcset' );
-            if ( $srcset ) {
-                foreach ( explode( ',', $srcset ) as $part ) {
-                    $bits = preg_split( '/\s+/', trim( $part ) );
-                    if ( ! empty( $bits[0] ) ) {
-                        $urls[] = self::strip_size_suffix( $bits[0] );
-                    }
+            return $urls;
+        }
+
+        // Fallback without ext-dom.
+        $pattern = '/\b(?:src|data-src|srcset|data-srcset|href|poster|data)\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/i';
+        if ( preg_match_all( $pattern, $content, $matches, PREG_SET_ORDER ) ) {
+            foreach ( $matches as $match ) {
+                $value = '' !== $match[1] ? $match[1] : ( isset( $match[2] ) ? $match[2] : '' );
+                if ( '' !== $value ) {
+                    $urls = array_merge( $urls, self::split_attribute_urls( 'srcset', $value ) );
                 }
             }
         }
 
-        foreach ( $dom->getElementsByTagName( 'a' ) as $anchor ) {
-            $href = $anchor->getAttribute( 'href' );
-            if ( $href && self::is_upload_url( $href ) ) {
-                $urls[] = $href;
+        return $urls;
+    }
+
+    /**
+     * A srcset holds several "url descriptor" pairs; every other attribute holds one URL.
+     */
+    private static function split_attribute_urls( $attribute, $value ) {
+        if ( 'srcset' !== $attribute && 'data-srcset' !== $attribute ) {
+            return array( trim( $value ) );
+        }
+
+        $urls = array();
+        foreach ( explode( ',', $value ) as $part ) {
+            $bits = preg_split( '/\s+/', trim( $part ) );
+            if ( ! empty( $bits[0] ) ) {
+                $urls[] = $bits[0];
             }
         }
 
-        foreach ( array_unique( $urls ) as $url ) {
+        return $urls;
+    }
+
+    /**
+     * Attachment IDs of local uploads referenced from an HTML fragment.
+     *
+     * @param string $content
+     * @return int[]
+     */
+    public static function extract_urls_from_content( $content ) {
+
+        if ( empty( $content ) || ! is_string( $content ) ) {
+            return array();
+        }
+
+        $ids = array();
+
+        foreach ( array_unique( self::collect_urls( $content ) ) as $url ) {
             if ( ! self::is_upload_url( $url ) ) {
                 continue;
             }
-            $id = attachment_url_to_postid( $url );
+
+            $id = self::url_to_attachment_id( $url );
+
             if ( $id > 0 ) {
                 $ids[] = $id;
             }
         }
 
-        return $ids;
+        return array_values( array_unique( $ids ) );
     }
 }

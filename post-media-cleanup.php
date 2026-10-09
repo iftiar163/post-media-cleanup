@@ -4,7 +4,7 @@
  * Plugin Name:       Post Media Cleanup
  * Plugin URI:        https://wordpress.org/plugins/post-media-cleanup/
  * Description:       Automatically deletes all associated media files when a post is permanently deleted.
- * Version:           2.3.0
+ * Version:           2.4.0
  * Requires at least: 5.0
  * Requires PHP:      7.4
  * Author:            Iftiar Hossain
@@ -21,7 +21,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('POSTMEDIAWEB_VERSION', '2.3.0');
+define('POSTMEDIAWEB_VERSION', '2.4.0');
 define('POSTMEDIAWEB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POSTMEDIAWEB_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POSTMEDIAWEB_OPTION_KEY', 'postmediaweb_settings');
@@ -47,7 +47,10 @@ function postmediaweb_activate()
         'delete_content_media'      => true,
         'delete_gallery'            => true,
         'skip_shared'               => true,
-        'post_types'                => ['post', 'page']
+        'post_types'                => ['post', 'page'],
+        'delete_pagebuilder'        => true,
+        'delete_acf'                => true,
+        'delete_woocommerce'        => true,
     ];
 
     // Preserve saved settings when the plugin is reactivated.
@@ -59,6 +62,11 @@ function postmediaweb_deactivate()
 }
 
 add_action('plugins_loaded', 'postmediaweb_init');
+
+// Keep the in-request settings cache in sync with the database.
+add_action('add_option_' . POSTMEDIAWEB_OPTION_KEY, ['Postmediaweb_Settings', 'clear_cache']);
+add_action('update_option_' . POSTMEDIAWEB_OPTION_KEY, ['Postmediaweb_Settings', 'clear_cache']);
+add_action('delete_option_' . POSTMEDIAWEB_OPTION_KEY, ['Postmediaweb_Settings', 'clear_cache']);
 
 function postmediaweb_init()
 {
