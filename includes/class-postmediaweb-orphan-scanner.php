@@ -164,7 +164,24 @@ class Postmediaweb_Orphan_Scanner
 
             if ($result) {
                 $deleted++;
+
+                if ( Postmediaweb_Settings::get( 'log_enabled' ) ) {
+                    $log_entries[] = array(
+                        'post_id'       => 0,
+                        'post_title'    => '',
+                        'post_type'     => 'orphan',
+                        'attachment_id' => $id,
+                        'file_name'     => wp_basename( (string) get_post_meta( $id, '_wp_attached_file', true ) ),
+                        'file_size'     => isset( $file_sizes[ $id ] ) ? $file_sizes[ $id ] : 0,
+                        'trigger_type'  => 'bulk_cleanup',
+                        'user_id'       => get_current_user_id(),
+                    );
+                }
             }
+        }
+
+        if ( ! empty( $log_entries ) ) {
+            Postmediaweb_Logger::log_bulk( $log_entries );
         }
 
         return array(

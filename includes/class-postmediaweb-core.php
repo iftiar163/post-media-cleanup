@@ -156,7 +156,22 @@ class Postmediaweb_Core {
                 continue;
             }
 
-            wp_delete_attachment( $att_id, true );
+            $result = wp_delete_attachment( $att_id, true );
+
+            if( $result && Postmediaweb_Settings::get( 'log_enabled' ) ) {
+                $file_path = get_attached_file( $att_id );
+
+                Postmediaweb_Logger::log( array(
+                    'post_id'       => $post_id,
+                    'post_title'    => get_the_title( $post_id ),
+                    'post_type'     => get_post_type( $post_id ),
+                    'attachment_id' => $att_id,
+                    'file_name'     => $file_path ? wp_basename( $file_path ) : '',
+                    'file_size'     => $file_path && file_exists( $file_path ) ? (int) filesize( $file_path ) : 0,
+                    'trigger_type'  => 'post_delete',
+                    'user_id'       => get_current_user_id(),
+                ) );
+            }
         }
     }
 

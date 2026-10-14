@@ -35,6 +35,7 @@ require_once POSTMEDIAWEB_PLUGIN_DIR . 'admin/class-postmediaweb-admin.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-orphan-scanner.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-ajax.php';
 require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-woocommerce-handler.php';
+require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-logger.php';
 
 register_activation_hook(__FILE__, 'postmediaweb_activate');
 register_deactivation_hook(__FILE__, 'postmediaweb_deactivate');
@@ -51,10 +52,14 @@ function postmediaweb_activate()
         'delete_pagebuilder'        => true,
         'delete_acf'                => true,
         'delete_woocommerce'        => true,
+        'log_enabled'           => true,
     ];
 
     // Preserve saved settings when the plugin is reactivated.
     add_option(POSTMEDIAWEB_OPTION_KEY, $defaults);
+
+    // Create the log file if logging is enabled.
+    Postmediaweb_Logger::create_table();
 }
 
 function postmediaweb_deactivate()
