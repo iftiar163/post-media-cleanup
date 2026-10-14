@@ -26,6 +26,7 @@ When you permanently delete a post, this plugin automatically finds and removes:
 * Only fires on permanent deletion — moving to trash is always safe
 * Skip Shared Media — never deletes a file used by another post
 * Works per post type — configure exactly which types trigger cleanup
+* Deletion Log — review media files the plugin permanently removes
 * Compatible with S3 and cloud storage
 * Multisite ready
 * Developer friendly — filter hooks to extend behaviour
@@ -74,6 +75,10 @@ Yes. Enable Products in the Post Types setting.
 = Does it work with S3 or cloud storage? =
 
 Yes. It uses wp_delete_attachment() which cloud storage plugins hook into automatically.
+
+= What does the Deletion Log record? =
+
+It records each media file this plugin successfully removes, including its filename, size, related post, and deletion source. It does not record post deletions where no media file was removed, and it cannot show deletions from before logging was enabled.
 
 == Screenshots ==
 

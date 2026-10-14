@@ -52,7 +52,7 @@ function postmediaweb_activate()
         'delete_pagebuilder'        => true,
         'delete_acf'                => true,
         'delete_woocommerce'        => true,
-        'log_enabled'           => true,
+        'log_enabled'               => true,
     ];
 
     // Preserve saved settings when the plugin is reactivated.
@@ -75,6 +75,7 @@ add_action('delete_option_' . POSTMEDIAWEB_OPTION_KEY, ['Postmediaweb_Settings',
 
 function postmediaweb_init()
 {
+    Postmediaweb_Logger::maybe_create_table();
     Postmediaweb_Core::get_instance();
     Postmediaweb_Ajax::get_instance();
     if (is_admin()) {

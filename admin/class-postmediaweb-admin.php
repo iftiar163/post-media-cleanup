@@ -451,143 +451,189 @@ class Postmediaweb_Admin
     }
 
     private function render_log_tab() {
-    $stats       = Postmediaweb_Logger::get_stats();
-    $per_page    = 20;
-    $page        = isset( $_GET['logpage'] ) ? max( 1, absint( $_GET['logpage'] ) ) : 1;
-    $filter_type = isset( $_GET['trigger'] ) ? sanitize_key( $_GET['trigger'] ) : '';
-    $result      = Postmediaweb_Logger::get_entries( array(
-        'per_page'     => $per_page,
-        'page'         => $page,
-        'trigger_type' => $filter_type,
-    ) );
+        $clear_log_notice = false;
+        if (
+            isset( $_POST['pmc_action'], $_POST['pmc_clear_log_nonce'] )
+            && is_string( $_POST['pmc_action'] )
+            && is_string( $_POST['pmc_clear_log_nonce'] )
+            && 'clear_log' === sanitize_key( wp_unslash( $_POST['pmc_action'] ) )
+            && current_user_can( 'manage_options' )
+            && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['pmc_clear_log_nonce'] ) ), 'pmc_clear_log' )
+        ) {
+            Postmediaweb_Logger::clear();
+            $clear_log_notice = true;
+        }
 
-    $total_pages = $result['total'] > 0 ? (int) ceil( $result['total'] / $per_page ) : 1;
-    $base_url    = admin_url( 'options-general.php?page=post-media-cleanup&tab=log' );
-    ?>
+        $stats        = Postmediaweb_Logger::get_stats();
+        $per_page     = 20;
+        $page         = isset( $_GET['logpage'] ) && is_scalar( $_GET['logpage'] ) ? max( 1, absint( $_GET['logpage'] ) ) : 1;
+        $filter_type  = isset( $_GET['trigger'] ) && is_string( $_GET['trigger'] ) ? sanitize_key( wp_unslash( $_GET['trigger'] ) ) : '';
+        $result       = Postmediaweb_Logger::get_entries( array(
+            'per_page'     => $per_page,
+            'page'         => $page,
+            'trigger_type' => $filter_type,
+        ) );
+        $total_pages  = $result['total'] > 0 ? (int) ceil( $result['total'] / $per_page ) : 1;
+        $base_url     = admin_url( 'options-general.php?page=post-media-cleanup&tab=log' );
+        $logging_on   = (bool) Postmediaweb_Settings::get( 'log_enabled' );
+        $filter_options = array(
+            ''             => __( 'All activity', 'post-media-cleanup' ),
+            'post_delete'  => __( 'Post deletion', 'post-media-cleanup' ),
+            'bulk_cleanup' => __( 'Bulk cleanup', 'post-media-cleanup' ),
+            'scheduled'    => __( 'Scheduled', 'post-media-cleanup' ),
+            'wpcli'        => __( 'WP-CLI', 'post-media-cleanup' ),
+        );
+        ?>
 
-    <div class="pmc-log-wrap">
-
-        <div class="pmc-log-stats">
-            <div class="pmc-stat-box">
-                <span class="pmc-stat-number"><?php echo esc_html( number_format_i18n( $stats['total_deleted'] ) ); ?></span>
-                <span class="pmc-stat-label"><?php esc_html_e( 'Total Files Deleted', 'post-media-cleanup' ); ?></span>
-            </div>
-            <div class="pmc-stat-box">
-                <span class="pmc-stat-number"><?php echo esc_html( size_format( $stats['total_size'] ) ); ?></span>
-                <span class="pmc-stat-label"><?php esc_html_e( 'Total Space Freed', 'post-media-cleanup' ); ?></span>
-            </div>
-            <div class="pmc-stat-box">
-                <span class="pmc-stat-number"><?php echo esc_html( number_format_i18n( $stats['post_delete'] ) ); ?></span>
-                <span class="pmc-stat-label"><?php esc_html_e( 'From Post Deletions', 'post-media-cleanup' ); ?></span>
-            </div>
-            <div class="pmc-stat-box">
-                <span class="pmc-stat-number"><?php echo esc_html( number_format_i18n( $stats['bulk_cleanup'] ) ); ?></span>
-                <span class="pmc-stat-label"><?php esc_html_e( 'From Bulk Cleanup', 'post-media-cleanup' ); ?></span>
-            </div>
-        </div>
-
-        <div class="pmc-log-toolbar">
-            <div class="pmc-log-filters">
-                <?php
-                $filter_options = array(
-                    ''             => __( 'All', 'post-media-cleanup' ),
-                    'post_delete'  => __( 'Post Deletion', 'post-media-cleanup' ),
-                    'bulk_cleanup' => __( 'Bulk Cleanup', 'post-media-cleanup' ),
-                    'scheduled'    => __( 'Scheduled', 'post-media-cleanup' ),
-                    'wpcli'        => __( 'WP-CLI', 'post-media-cleanup' ),
-                );
-                foreach ( $filter_options as $value => $label ) {
-                    $active = $filter_type === $value ? ' pmc-filter-active' : '';
-                    $url    = $base_url . ( $value ? '&trigger=' . $value : '' );
-                    echo '<a href="' . esc_url( $url ) . '" class="pmc-filter-btn' . $active . '">' . esc_html( $label ) . '</a> ';
-                }
-                ?>
-            </div>
-
-            <?php if ( $stats['total_deleted'] > 0 ) : ?>
-            <form method="post" action="" style="display:inline;">
-                <?php wp_nonce_field( 'pmc_clear_log', 'pmc_clear_log_nonce' ); ?>
-                <input type="hidden" name="pmc_action" value="clear_log">
-                <button type="submit" class="button pmc-clear-log-btn"
-                    onclick="return confirm('<?php esc_attr_e( 'Are you sure? This will permanently clear the entire deletion log.', 'post-media-cleanup' ); ?>')">
-                    <?php esc_html_e( 'Clear Log', 'post-media-cleanup' ); ?>
-                </button>
-            </form>
-            <?php endif; ?>
-        </div>
-
-        <?php if ( empty( $result['items'] ) ) : ?>
-            <p class="pmc-log-empty">
-                <?php esc_html_e( 'No deletion records found.', 'post-media-cleanup' ); ?>
-            </p>
-        <?php else : ?>
-            <table class="wp-list-table widefat fixed striped pmc-log-table">
-                <thead>
-                    <tr>
-                        <th><?php esc_html_e( 'File Name', 'post-media-cleanup' ); ?></th>
-                        <th><?php esc_html_e( 'Size', 'post-media-cleanup' ); ?></th>
-                        <th><?php esc_html_e( 'Post', 'post-media-cleanup' ); ?></th>
-                        <th><?php esc_html_e( 'Type', 'post-media-cleanup' ); ?></th>
-                        <th><?php esc_html_e( 'Trigger', 'post-media-cleanup' ); ?></th>
-                        <th><?php esc_html_e( 'Deleted At', 'post-media-cleanup' ); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ( $result['items'] as $entry ) : ?>
-                    <tr>
-                        <td><code><?php echo esc_html( $entry->file_name ); ?></code></td>
-                        <td><?php echo esc_html( $entry->file_size > 0 ? size_format( $entry->file_size ) : '—' ); ?></td>
-                        <td>
-                            <?php if ( $entry->post_id > 0 ) : ?>
-                                <span title="ID: <?php echo esc_attr( $entry->post_id ); ?>">
-                                    <?php echo esc_html( $entry->post_title ?: '(deleted)' ); ?>
-                                </span>
-                            <?php else : ?>
-                                <span class="pmc-log-orphan"><?php esc_html_e( 'Orphan', 'post-media-cleanup' ); ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td><code><?php echo esc_html( $entry->post_type ); ?></code></td>
-                        <td>
-                            <span class="pmc-trigger-badge pmc-trigger-<?php echo esc_attr( $entry->trigger_type ); ?>">
-                                <?php echo esc_html( $entry->trigger_type ); ?>
-                            </span>
-                        </td>
-                        <td><?php echo esc_html( mysql2date( 'd M Y H:i', $entry->deleted_at ) ); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-
-            <?php if ( $total_pages > 1 ) : ?>
-            <div class="pmc-log-pagination">
-                <?php if ( $page > 1 ) : ?>
-                    <a href="<?php echo esc_url( $base_url . '&logpage=' . ( $page - 1 ) . ( $filter_type ? '&trigger=' . $filter_type : '' ) ); ?>" class="button">← <?php esc_html_e( 'Previous', 'post-media-cleanup' ); ?></a>
-                <?php endif; ?>
-                <span class="pmc-log-page-info">
-                    <?php echo esc_html( sprintf( __( 'Page %1$d of %2$d', 'post-media-cleanup' ), $page, $total_pages ) ); ?>
+        <div class="pmc-log-wrap">
+            <div class="pmc-log-header">
+                <div>
+                    <h2><?php esc_html_e( 'Deletion activity', 'post-media-cleanup' ); ?></h2>
+                    <p><?php esc_html_e( 'Review media files permanently removed by Post Media Cleanup.', 'post-media-cleanup' ); ?></p>
+                </div>
+                <span class="pmc-log-status <?php echo $logging_on ? 'pmc-log-status-on' : 'pmc-log-status-off'; ?>">
+                    <span aria-hidden="true"></span>
+                    <?php echo $logging_on ? esc_html__( 'Log enabled', 'post-media-cleanup' ) : esc_html__( 'Log disabled', 'post-media-cleanup' ); ?>
                 </span>
-                <?php if ( $page < $total_pages ) : ?>
-                    <a href="<?php echo esc_url( $base_url . '&logpage=' . ( $page + 1 ) . ( $filter_type ? '&trigger=' . $filter_type : '' ) ); ?>" class="button"><?php esc_html_e( 'Next', 'post-media-cleanup' ); ?> →</a>
+            </div>
+
+            <?php if ( $clear_log_notice ) : ?>
+                <div class="notice notice-success inline"><p><?php esc_html_e( 'Deletion log cleared.', 'post-media-cleanup' ); ?></p></div>
+            <?php endif; ?>
+
+            <div class="pmc-log-stats">
+                <div class="pmc-stat-box pmc-stat-box-primary">
+                    <span class="pmc-stat-label"><?php esc_html_e( 'Files deleted', 'post-media-cleanup' ); ?></span>
+                    <span class="pmc-stat-number"><?php echo esc_html( number_format_i18n( $stats['total_deleted'] ) ); ?></span>
+                </div>
+                <div class="pmc-stat-box">
+                    <span class="pmc-stat-label"><?php esc_html_e( 'Space freed', 'post-media-cleanup' ); ?></span>
+                    <span class="pmc-stat-number"><?php echo esc_html( size_format( $stats['total_size'] ) ); ?></span>
+                </div>
+                <div class="pmc-stat-box">
+                    <span class="pmc-stat-label"><?php esc_html_e( 'Post-deletion files', 'post-media-cleanup' ); ?></span>
+                    <span class="pmc-stat-number"><?php echo esc_html( number_format_i18n( $stats['post_delete'] ) ); ?></span>
+                </div>
+                <div class="pmc-stat-box">
+                    <span class="pmc-stat-label"><?php esc_html_e( 'Bulk-cleanup files', 'post-media-cleanup' ); ?></span>
+                    <span class="pmc-stat-number"><?php echo esc_html( number_format_i18n( $stats['bulk_cleanup'] ) ); ?></span>
+                </div>
+            </div>
+
+            <div class="pmc-log-toolbar">
+                <nav class="pmc-log-filters" aria-label="<?php esc_attr_e( 'Filter deletion activity', 'post-media-cleanup' ); ?>">
+                    <?php foreach ( $filter_options as $value => $label ) : ?>
+                        <?php
+                        $url = $value ? add_query_arg( 'trigger', $value, $base_url ) : $base_url;
+                        $active = $filter_type === $value;
+                        ?>
+                        <a href="<?php echo esc_url( $url ); ?>" class="pmc-filter-btn<?php echo $active ? ' pmc-filter-active' : ''; ?>"<?php echo $active ? ' aria-current="page"' : ''; ?>>
+                            <?php echo esc_html( $label ); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </nav>
+
+                <?php if ( $stats['total_deleted'] > 0 ) : ?>
+                    <form method="post" action="">
+                        <?php wp_nonce_field( 'pmc_clear_log', 'pmc_clear_log_nonce' ); ?>
+                        <input type="hidden" name="pmc_action" value="clear_log">
+                        <button type="submit" class="button pmc-clear-log-btn"
+                            onclick="return confirm('<?php esc_attr_e( 'Are you sure? This will permanently clear the entire deletion log.', 'post-media-cleanup' ); ?>')">
+                            <?php esc_html_e( 'Clear log', 'post-media-cleanup' ); ?>
+                        </button>
+                    </form>
                 <?php endif; ?>
             </div>
+
+            <?php if ( empty( $result['items'] ) ) : ?>
+                <div class="pmc-log-empty-state">
+                    <span class="dashicons dashicons-archive" aria-hidden="true"></span>
+                    <?php if ( $filter_type || $result['total'] > 0 ) : ?>
+                        <h3><?php esc_html_e( 'No matching activity', 'post-media-cleanup' ); ?></h3>
+                        <p><?php esc_html_e( 'Try a different activity filter to find the records you are looking for.', 'post-media-cleanup' ); ?></p>
+                    <?php else : ?>
+                        <h3><?php esc_html_e( 'No file deletions recorded yet', 'post-media-cleanup' ); ?></h3>
+                        <?php if ( $logging_on ) : ?>
+                            <p><?php esc_html_e( 'This log records media files removed by this plugin from now on. It cannot show earlier deletions, and deleting a post will not create a record if no media files were removed by the plugin.', 'post-media-cleanup' ); ?></p>
+                        <?php else : ?>
+                            <p><?php esc_html_e( 'Turn on Deletion Log in the Settings tab to record future media file deletions.', 'post-media-cleanup' ); ?></p>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            <?php else : ?>
+                <p class="pmc-log-result-count">
+                    <?php
+                    $first_result = ( ( $page - 1 ) * $per_page ) + 1;
+                    $last_result  = min( $page * $per_page, $result['total'] );
+                    echo esc_html( sprintf(
+                        __( 'Showing %1$s–%2$s of %3$s files', 'post-media-cleanup' ),
+                        number_format_i18n( $first_result ),
+                        number_format_i18n( $last_result ),
+                        number_format_i18n( $result['total'] )
+                    ) );
+                    ?>
+                </p>
+                <div class="pmc-log-table-wrap">
+                    <table class="wp-list-table widefat fixed striped pmc-log-table">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e( 'File', 'post-media-cleanup' ); ?></th>
+                                <th><?php esc_html_e( 'Size', 'post-media-cleanup' ); ?></th>
+                                <th><?php esc_html_e( 'Related post', 'post-media-cleanup' ); ?></th>
+                                <th><?php esc_html_e( 'Post type', 'post-media-cleanup' ); ?></th>
+                                <th><?php esc_html_e( 'Source', 'post-media-cleanup' ); ?></th>
+                                <th><?php esc_html_e( 'Deleted', 'post-media-cleanup' ); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ( $result['items'] as $entry ) : ?>
+                                <?php
+                                $trigger_label = isset( $filter_options[ $entry->trigger_type ] )
+                                    ? $filter_options[ $entry->trigger_type ]
+                                    : ucwords( str_replace( '_', ' ', $entry->trigger_type ) );
+                                ?>
+                                <tr>
+                                    <td><code class="pmc-log-file-name"><?php echo esc_html( $entry->file_name ? $entry->file_name : __( 'File details unavailable', 'post-media-cleanup' ) ); ?></code></td>
+                                    <td><?php echo esc_html( $entry->file_size > 0 ? size_format( $entry->file_size ) : '—' ); ?></td>
+                                    <td>
+                                        <?php if ( $entry->post_id > 0 ) : ?>
+                                            <span class="pmc-log-post-title" title="<?php echo esc_attr( sprintf( __( 'Post ID: %d', 'post-media-cleanup' ), $entry->post_id ) ); ?>">
+                                                <?php echo esc_html( $entry->post_title ? $entry->post_title : __( '(Deleted post)', 'post-media-cleanup' ) ); ?>
+                                            </span>
+                                        <?php else : ?>
+                                            <span class="pmc-log-orphan"><?php esc_html_e( 'Orphan media', 'post-media-cleanup' ); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><span class="pmc-log-type"><?php echo esc_html( $entry->post_type ? $entry->post_type : '—' ); ?></span></td>
+                                    <td>
+                                        <span class="pmc-trigger-badge pmc-trigger-<?php echo esc_attr( sanitize_html_class( $entry->trigger_type ) ); ?>">
+                                            <?php echo esc_html( $trigger_label ); ?>
+                                        </span>
+                                    </td>
+                                    <td class="pmc-log-date"><?php echo esc_html( mysql2date( 'M j, Y · H:i', $entry->deleted_at ) ); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <?php if ( $total_pages > 1 ) : ?>
+                    <div class="pmc-log-pagination">
+                        <?php if ( $page > 1 ) : ?>
+                            <a href="<?php echo esc_url( add_query_arg( array_filter( array( 'logpage' => $page - 1, 'trigger' => $filter_type ) ), $base_url ) ); ?>" class="button"><?php esc_html_e( '← Previous', 'post-media-cleanup' ); ?></a>
+                        <?php endif; ?>
+                        <span class="pmc-log-page-info">
+                            <?php echo esc_html( sprintf( __( 'Page %1$d of %2$d', 'post-media-cleanup' ), $page, $total_pages ) ); ?>
+                        </span>
+                        <?php if ( $page < $total_pages ) : ?>
+                            <a href="<?php echo esc_url( add_query_arg( array_filter( array( 'logpage' => $page + 1, 'trigger' => $filter_type ) ), $base_url ) ); ?>" class="button"><?php esc_html_e( 'Next →', 'post-media-cleanup' ); ?></a>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
-        <?php endif; ?>
-
-    </div>
-    <?php
-
-    // Handle clear log form submission.
-    if (
-        isset( $_POST['pmc_action'] ) &&
-        'clear_log' === $_POST['pmc_action'] &&
-        isset( $_POST['pmc_clear_log_nonce'] ) &&
-        wp_verify_nonce( sanitize_key( $_POST['pmc_clear_log_nonce'] ), 'pmc_clear_log' )
-        && current_user_can( 'manage_options' )
-    ) {
-        Postmediaweb_Logger::clear();
-        echo '<div class="notice notice-success"><p>' . esc_html__( 'Deletion log cleared.', 'post-media-cleanup' ) . '</p></div>';
+        </div>
+        <?php
     }
-}
 
     private function render_settings_tab()
     {
@@ -953,8 +999,11 @@ JS;
 
     private function get_admin_css() {
         return '
-        .pmc-wrap { max-width: 900px; }
-        .pmc-tab-content { background: #fff; border: 1px solid #c3c4c7; border-top: none; padding: 24px; }
+        .pmc-wrap { max-width: 1120px; }
+        .pmc-wrap .nav-tab-wrapper { border-bottom: 0; padding-left: 2px; }
+        .pmc-wrap .nav-tab { margin-right: 6px; padding: 8px 14px; border-color: #dcdcde; border-radius: 7px 7px 0 0; background: #f6f7f7; color: #50575e; }
+        .pmc-wrap .nav-tab-active, .pmc-wrap .nav-tab-active:hover { border-color: #dcdcde; border-bottom-color: #fff; background: #fff; color: #1d2327; }
+        .pmc-tab-content { background: #fff; border: 1px solid #dcdcde; border-top: none; padding: 28px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
         .pmc-cleanup-intro { font-size: 14px; color: #50575e; margin: 0 0 20px; }
         .pmc-scan-actions { margin-bottom: 24px; }
         .pmc-progress-wrap { margin: 20px 0; }
@@ -1040,28 +1089,61 @@ JS;
         }
         .pmc-woo-scope { margin: 8px 0 0 4px; padding: 0; list-style: none; }
         .pmc-woo-scope li { font-size: 12px; color: #50575e; margin-bottom: 3px; }
-        /* ── Deletion Log ── */
-        .pmc-log-stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-        .pmc-stat-box { background: #f6f7f7; border: 1px solid #c3c4c7; border-radius: 4px; padding: 16px 20px; min-width: 160px; text-align: center; }
-        .pmc-stat-number { display: block; font-size: 28px; font-weight: 700; color: #1d2327; line-height: 1; margin-bottom: 6px; }
-        .pmc-stat-label { font-size: 12px; color: #50575e; }
-        .pmc-log-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
-        .pmc-log-filters { display: flex; gap: 4px; flex-wrap: wrap; }
-        .pmc-filter-btn { display: inline-block; padding: 4px 10px; border: 1px solid #c3c4c7; border-radius: 3px; font-size: 12px; color: #50575e; text-decoration: none; background: #fff; }
-        .pmc-filter-btn:hover { border-color: #2271b1; color: #2271b1; }
-        .pmc-filter-active { background: #2271b1 !important; border-color: #2271b1 !important; color: #fff !important; }
-        .pmc-clear-log-btn { color: #b32d2e !important; border-color: #b32d2e !important; }
-        .pmc-log-table { margin-top: 0; }
-        .pmc-log-table code { font-size: 11px; }
-        .pmc-log-orphan { color: #8c8f94; font-style: italic; }
-        .pmc-log-empty { color: #50575e; font-style: italic; padding: 20px 0; }
-        .pmc-trigger-badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 600; }
-        .pmc-trigger-post_delete { background: #e0f0ff; color: #2271b1; }
-        .pmc-trigger-bulk_cleanup { background: #fff3cd; color: #856404; }
-        .pmc-trigger-scheduled { background: #d1e7dd; color: #0a3622; }
-        .pmc-trigger-wpcli { background: #f0e0ff; color: #6600cc; }
-        .pmc-log-pagination { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
-        .pmc-log-page-info { font-size: 13px; color: #50575e; }
+        .pmc-log-wrap { color: #1d2327; }
+        .pmc-log-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin: 0 0 24px; }
+        .pmc-log-header h2 { margin: 0 0 6px; font-size: 22px; line-height: 1.3; color: #1d2327; }
+        .pmc-log-header p { margin: 0; color: #646970; font-size: 13px; }
+        .pmc-log-status { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; padding: 7px 11px; border: 1px solid #dcdcde; border-radius: 20px; background: #fff; color: #50575e; font-size: 12px; font-weight: 600; }
+        .pmc-log-status > span { width: 8px; height: 8px; border-radius: 50%; background: #8c8f94; }
+        .pmc-log-status-on > span { background: #00a32a; box-shadow: 0 0 0 3px #edfaef; }
+        .pmc-log-status-off > span { background: #d63638; box-shadow: 0 0 0 3px #fcf0f1; }
+        .pmc-log-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 26px; }
+        .pmc-stat-box { display: flex; flex-direction: column-reverse; justify-content: center; gap: 7px; min-height: 88px; padding: 16px 18px; border: 1px solid #e2e4e7; border-radius: 9px; background: linear-gradient(145deg, #fff 0%, #f8f9fa 100%); box-shadow: 0 2px 5px rgba(0,0,0,.025); }
+        .pmc-stat-box-primary { border-color: #c6dff3; background: linear-gradient(145deg, #fff 0%, #f2f8fc 100%); }
+        .pmc-stat-number { display: block; font-size: 27px; font-weight: 700; letter-spacing: -.4px; color: #1d2327; line-height: 1.1; }
+        .pmc-stat-label { font-size: 12px; color: #646970; font-weight: 500; }
+        .pmc-log-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid #f0f0f1; }
+        .pmc-log-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+        .pmc-filter-btn { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid #dcdcde; border-radius: 6px; font-size: 12px; color: #50575e; text-decoration: none; background: #fff; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+        .pmc-filter-btn:hover, .pmc-filter-btn:focus { border-color: #2271b1; color: #135e96; outline: none; box-shadow: 0 0 0 1px #2271b1; }
+        .pmc-filter-active, .pmc-filter-active:hover, .pmc-filter-active:focus { background: #2271b1; border-color: #2271b1; color: #fff; box-shadow: none; }
+        .pmc-clear-log-btn { color: #b32d2e !important; border-color: #d63638 !important; border-radius: 6px !important; }
+        .pmc-clear-log-btn:hover { background: #fcf0f1 !important; }
+        .pmc-log-result-count { margin: 16px 0 10px; color: #646970; font-size: 12px; }
+        .pmc-log-table-wrap { overflow-x: auto; border: 1px solid #e2e4e7; border-radius: 8px; }
+        .pmc-log-table { margin: 0; border: 0; border-spacing: 0; table-layout: auto; min-width: 820px; }
+        .pmc-log-table thead th { padding: 12px 14px; background: #f6f7f7; color: #50575e; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+        .pmc-log-table td { padding: 13px 14px; color: #3c434a; vertical-align: middle; }
+        .pmc-log-table tbody tr:last-child td { border-bottom: 0; }
+        .pmc-log-table code { padding: 3px 6px; border: 1px solid #e2e4e7; border-radius: 4px; background: #f6f7f7; font-size: 11px; white-space: nowrap; }
+        .pmc-log-file-name { color: #1d2327; }
+        .pmc-log-post-title { font-weight: 500; }
+        .pmc-log-type { color: #646970; font-size: 12px; }
+        .pmc-log-date { white-space: nowrap; color: #646970 !important; font-size: 12px; }
+        .pmc-log-orphan { color: #646970; font-style: italic; }
+        .pmc-log-empty-state { padding: 48px 24px; text-align: center; }
+        .pmc-log-empty-state > .dashicons { display: inline-block; width: 42px; height: 42px; margin-bottom: 10px; color: #8c8f94; font-size: 42px; }
+        .pmc-log-empty-state h3 { margin: 0 0 8px; color: #1d2327; font-size: 16px; }
+        .pmc-log-empty-state p { max-width: 580px; margin: 0 auto; color: #646970; font-size: 13px; line-height: 1.6; }
+        .pmc-trigger-badge { display: inline-flex; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+        .pmc-trigger-post_delete { background: #e8f3fb; color: #135e96; }
+        .pmc-trigger-bulk_cleanup { background: #fcf0d8; color: #8a5d00; }
+        .pmc-trigger-scheduled { background: #edfaef; color: #116329; }
+        .pmc-trigger-wpcli { background: #f3eafa; color: #684399; }
+        .pmc-log-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 20px; }
+        .pmc-log-pagination .button { border-radius: 5px; }
+        .pmc-log-page-info { font-size: 12px; color: #646970; }
+        @media screen and (max-width: 782px) {
+            .pmc-tab-content { padding: 18px; }
+            .pmc-log-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+            .pmc-stat-box { min-height: 76px; padding: 13px; }
+            .pmc-stat-number { font-size: 23px; }
+        }
+        @media screen and (max-width: 480px) {
+            .pmc-log-header { flex-direction: column; }
+            .pmc-log-stats { grid-template-columns: 1fr 1fr; }
+            .pmc-log-toolbar { align-items: flex-start; }
+        }
         ';
     }
 }

@@ -129,6 +129,7 @@ class Postmediaweb_Orphan_Scanner
 
         $deleted = 0;
         $skipped = array();
+        $log_entries = array();
 
         foreach (array_unique($ids) as $id) {
             $id = absint($id);
@@ -160,6 +161,19 @@ class Postmediaweb_Orphan_Scanner
                 continue;
             }
 
+            $file_path = '';
+            $file_size = 0;
+            if ( Postmediaweb_Settings::get( 'log_enabled' ) ) {
+                $file_path = get_attached_file( $id );
+                if ( $file_path && is_file( $file_path ) ) {
+                    $size = @filesize( $file_path );
+                    if ( false !== $size ) {
+                        $file_size = (int) $size;
+                    }
+                }
+            }
+
+            $file_name = $file_path ? wp_basename( $file_path ) : wp_basename( (string) get_post_meta( $id, '_wp_attached_file', true ) );
             $result = wp_delete_attachment($id, true);
 
             if ($result) {
@@ -171,8 +185,8 @@ class Postmediaweb_Orphan_Scanner
                         'post_title'    => '',
                         'post_type'     => 'orphan',
                         'attachment_id' => $id,
-                        'file_name'     => wp_basename( (string) get_post_meta( $id, '_wp_attached_file', true ) ),
-                        'file_size'     => isset( $file_sizes[ $id ] ) ? $file_sizes[ $id ] : 0,
+                        'file_name'     => $file_name,
+                        'file_size'     => $file_size,
                         'trigger_type'  => 'bulk_cleanup',
                         'user_id'       => get_current_user_id(),
                     );

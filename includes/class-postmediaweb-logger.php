@@ -75,6 +75,15 @@ class Postmediaweb_Logger {
     }
 
     /**
+     * Create or upgrade the log table for existing installations.
+     */
+    public static function maybe_create_table() {
+        if ( (int) get_option( self::SCHEMA_OPTION, 0 ) < self::SCHEMA_VERSION ) {
+            self::create_table();
+        }
+    }
+
+    /**
      * Drop the table completely.
      *
      * Only called from uninstall.php — never on deactivation.
@@ -240,7 +249,7 @@ class Postmediaweb_Logger {
         // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         $items = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY deleted_at {$order} LIMIT %d OFFSET %d",
+                "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY deleted_at {$order}, id {$order} LIMIT %d OFFSET %d",
                 $query_params
             )
         );

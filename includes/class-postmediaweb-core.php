@@ -93,6 +93,8 @@ class Postmediaweb_Core {
         $this->pending[ $post_id ] = array(
             'attachment_ids'    => $ids,
             'excluded_post_ids' => array_values( array_unique( array_map( 'absint', $excluded_post_ids ) ) ),
+            'post_title'        => get_the_title( $post_id ),
+            'post_type'         => $post->post_type,
         );
     }
 
@@ -156,18 +158,28 @@ class Postmediaweb_Core {
                 continue;
             }
 
+            $file_path = '';
+            $file_size = 0;
+            if ( Postmediaweb_Settings::get( 'log_enabled' ) ) {
+                $file_path = get_attached_file( $att_id );
+                if ( $file_path && is_file( $file_path ) ) {
+                    $size = @filesize( $file_path );
+                    if ( false !== $size ) {
+                        $file_size = (int) $size;
+                    }
+                }
+            }
+
             $result = wp_delete_attachment( $att_id, true );
 
             if( $result && Postmediaweb_Settings::get( 'log_enabled' ) ) {
-                $file_path = get_attached_file( $att_id );
-
                 Postmediaweb_Logger::log( array(
                     'post_id'       => $post_id,
-                    'post_title'    => get_the_title( $post_id ),
-                    'post_type'     => get_post_type( $post_id ),
+                    'post_title'    => $pending['post_title'],
+                    'post_type'     => $pending['post_type'],
                     'attachment_id' => $att_id,
                     'file_name'     => $file_path ? wp_basename( $file_path ) : '',
-                    'file_size'     => $file_path && file_exists( $file_path ) ? (int) filesize( $file_path ) : 0,
+                    'file_size'     => $file_size,
                     'trigger_type'  => 'post_delete',
                     'user_id'       => get_current_user_id(),
                 ) );

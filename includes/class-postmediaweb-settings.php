@@ -17,6 +17,7 @@ class Postmediaweb_Settings {
         'delete_pagebuilder'   => true,
         'delete_acf'           => true,
         'delete_woocommerce'   => true,
+        'log_enabled'          => true,
     );
 
     public static function get( $key ) {
