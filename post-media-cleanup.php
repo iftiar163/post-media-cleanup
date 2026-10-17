@@ -68,6 +68,16 @@ function postmediaweb_deactivate()
 
 add_action('plugins_loaded', 'postmediaweb_init');
 
+add_action( 'plugins_loaded', 'postmediaweb_maybe_upgrade_db' );
+
+function postmediaweb_maybe_upgrade_db() {
+    $installed = (int) get_option( Postmediaweb_Logger::SCHEMA_OPTION, 0 );
+
+    if ( $installed < Postmediaweb_Logger::SCHEMA_VERSION ) {
+        Postmediaweb_Logger::create_table();
+    }
+}
+
 // Keep the in-request settings cache in sync with the database.
 add_action('add_option_' . POSTMEDIAWEB_OPTION_KEY, ['Postmediaweb_Settings', 'clear_cache']);
 add_action('update_option_' . POSTMEDIAWEB_OPTION_KEY, ['Postmediaweb_Settings', 'clear_cache']);
@@ -81,4 +91,12 @@ function postmediaweb_init()
     if (is_admin()) {
         Postmediaweb_Admin::get_instance();
     }
+}
+
+// Load CLI commands only when WP-CLI is running.
+// Without this guard, WP_CLI::add_command() would fatal
+// on every normal browser request.
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+    require_once POSTMEDIAWEB_PLUGIN_DIR . 'includes/class-postmediaweb-cli.php';
+    WP_CLI::add_command( 'pmc', 'Postmediaweb_CLI' );
 }

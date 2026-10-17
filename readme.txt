@@ -58,6 +58,16 @@ add_filter( 'postmediaweb_should_delete_attachment', function( $should, $att_id,
 2. Activate through the Plugins screen
 3. Go to Settings → Post Media Cleanup to configure
 
+== WP-CLI ==
+
+The plugin registers the `wp pmc` command group when WP-CLI is running and this
+plugin is active. Commands are available for status, orphan scans, cleanup, and
+deletion logs. Start with `wp help pmc`. The cleanup command permanently deletes
+files, so preview with `wp pmc cleanup --dry-run` first.
+
+For Local setup, examples, safe testing steps, and command output details, see
+`docs/wp-cli-local.md` in the plugin folder.
+
 == Frequently Asked Questions ==
 
 = Does it delete media when I move a post to trash? =

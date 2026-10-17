@@ -120,7 +120,7 @@ class Postmediaweb_Orphan_Scanner
      *     @type int[] $skipped IDs skipped because they failed a re-check.
      * }
      */
-    public static function delete(array $ids)
+    public static function delete(array $ids, $trigger_type = 'bulk_cleanup')
     {
         wp_raise_memory_limit('admin');
         if (function_exists('set_time_limit')) {
@@ -145,7 +145,7 @@ class Postmediaweb_Orphan_Scanner
                 continue;
             }
 
-            if (! current_user_can('delete_post', $id)) {
+            if ( is_user_logged_in() && ! current_user_can( 'delete_post', $id ) ) {
                 $skipped[] = $id;
                 continue;
             }
@@ -187,7 +187,7 @@ class Postmediaweb_Orphan_Scanner
                         'attachment_id' => $id,
                         'file_name'     => $file_name,
                         'file_size'     => $file_size,
-                        'trigger_type'  => 'bulk_cleanup',
+                        'trigger_type'  => $trigger_type,
                         'user_id'       => get_current_user_id(),
                     );
                 }
